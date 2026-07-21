@@ -10,6 +10,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/kyransciberras/bjj-streaming/internal/auth"
 	"github.com/kyransciberras/bjj-streaming/internal/config"
 	"github.com/kyransciberras/bjj-streaming/internal/database"
 	"github.com/kyransciberras/bjj-streaming/internal/httpserver"
@@ -38,9 +39,16 @@ func run() error {
 		return err
 	}
 	defer db.Close()
+	authHandler, err := auth.NewHandler(auth.NewStore(db), auth.Settings{
+		CookieSecure: cfg.AuthCookieSecure, InvitationTTL: cfg.InvitationTTL,
+		SessionIdleTTL: cfg.SessionIdleTTL, SessionAbsoluteTTL: cfg.SessionAbsoluteTTL,
+	}, cfg.LoginRateLimit, cfg.InvitationRateLimit)
+	if err != nil {
+		return err
+	}
 
 	server := &http.Server{
-		Addr: cfg.HTTPAddr, Handler: httpserver.New(logger, db),
+		Addr: cfg.HTTPAddr, Handler: httpserver.New(logger, db, authHandler),
 		ReadHeaderTimeout: 5 * time.Second, ReadTimeout: 15 * time.Second,
 		WriteTimeout: 15 * time.Second, IdleTimeout: 60 * time.Second,
 	}

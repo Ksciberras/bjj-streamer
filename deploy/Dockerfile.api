@@ -5,8 +5,9 @@ RUN go mod download
 COPY cmd ./cmd
 COPY internal ./internal
 RUN CGO_ENABLED=0 go build -o /out/api ./cmd/api
+RUN CGO_ENABLED=0 go build -o /out/bootstrap-admin ./cmd/bootstrap-admin
 
 FROM gcr.io/distroless/static-debian12:nonroot
 COPY --from=build /out/api /api
+COPY --from=build /out/bootstrap-admin /bootstrap-admin
 ENTRYPOINT ["/api"]
-

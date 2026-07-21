@@ -44,6 +44,20 @@ func TestLoadRequiresDatabaseURL(t *testing.T) {
 	}
 }
 
+func TestProductionRequiresSecureAuthCookie(t *testing.T) {
+	_, err := load(mapLookup(map[string]string{"APP_ENV": "production", "DATABASE_URL": "postgres://user:pass@db/app", "AUTH_COOKIE_SECURE": "false"}))
+	if err == nil || !strings.Contains(err.Error(), "AUTH_COOKIE_SECURE") {
+		t.Fatalf("expected secure cookie error, got %v", err)
+	}
+}
+
+func TestSessionIdleCannotExceedAbsoluteLifetime(t *testing.T) {
+	_, err := load(mapLookup(map[string]string{"DATABASE_URL": "postgres://user:pass@db/app", "SESSION_IDLE_TTL": "2h", "SESSION_ABSOLUTE_TTL": "1h"}))
+	if err == nil || !strings.Contains(err.Error(), "SESSION_IDLE_TTL") {
+		t.Fatalf("expected session lifetime error, got %v", err)
+	}
+}
+
 func mapLookup(values map[string]string) func(string) (string, bool) {
 	return func(key string) (string, bool) { value, ok := values[key]; return value, ok }
 }

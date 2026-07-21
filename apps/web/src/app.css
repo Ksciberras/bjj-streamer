@@ -15,7 +15,17 @@ main {
   background: radial-gradient(circle at 80% 20%, #294c39, transparent 40%);
 }
 
-h1 { margin: 0; font-size: clamp(3rem, 10vw, 8rem); letter-spacing: -0.06em; }
+h1 { margin: 0 0 1rem; font-size: clamp(2.5rem, 7vw, 5rem); letter-spacing: -0.05em; }
 p { max-width: 36rem; color: #b7c5bc; font-size: 1.1rem; }
 .eyebrow { color: #8bd3a8; font-size: 0.8rem; font-weight: 700; letter-spacing: 0.18em; text-transform: uppercase; }
-
+.card { width: min(32rem, 100%); }
+form { display: grid; gap: 1rem; margin: 1.5rem 0; }
+label { display: grid; gap: 0.4rem; color: #b7c5bc; font-weight: 650; }
+input, select, button { box-sizing: border-box; width: 100%; border: 1px solid #456052; border-radius: 0.5rem; padding: 0.8rem; font: inherit; }
+input, select { color: #eef2ed; background: #18231d; }
+button { border: 0; color: #0b1710; background: #8bd3a8; font-weight: 750; cursor: pointer; }
+button.secondary { width: auto; color: #eef2ed; background: #2b3b32; }
+.invite { border-top: 1px solid #33453b; margin: 2rem 0; padding-top: 1rem; }
+.invite h2 { margin-bottom: 0; }
+.invitation-link { overflow-wrap: anywhere; }
+.error { color: #ff9c9c; }

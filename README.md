@@ -20,6 +20,14 @@ The web application is at <http://localhost:5173>. API liveness is at <http://lo
 docker compose down
 ```
 
+On the first start only, create the initial administrator interactively. The command refuses to run after any user exists and does not accept the password as an argument:
+
+```bash
+docker compose run --rm --entrypoint /bootstrap-admin api --email you@example.com
+```
+
+Sign in at <http://localhost:5173>. An administrator can create an expiring invitation for another user and copy its one-time link. There is no public registration endpoint.
+
 To remove development database data as well, explicitly run `docker compose down --volumes`.
 
 ## Host development
@@ -49,6 +57,8 @@ Migrations are paired, immutable SQL files under `db/migrations`. Create the nex
 
 All backend processes validate configuration before starting. See `.env.example` for defaults. `DATABASE_URL` is required; supported `APP_ENV` values are `development`, `test`, and `production`; durations use Go syntax such as `5s`; and log levels are `debug`, `info`, `warn`, or `error`. Logs are newline-delimited JSON. HTTP logs include an `X-Request-ID`, preserving a reasonable upstream value or generating one.
 
+Authentication uses strict SameSite cookies. The session cookie is HTTP-only; state-changing authenticated requests also require the per-session CSRF token. `AUTH_COOKIE_SECURE=true` is mandatory in production. Invitations expire after `INVITATION_TTL`; sessions enforce both idle and absolute expiry. Rate-limit settings are per minute and held in process memory for the initial single-Droplet architecture.
+
 `/healthz` reports process liveness without touching dependencies. `/readyz` returns `200` only when PostgreSQL responds, otherwise `503`.
 
 ## Verification
@@ -59,6 +69,7 @@ From the repository root:
 go fmt ./...
 go vet ./...
 go test ./...
+TEST_DATABASE_URL='postgres://bjj:bjj@localhost:5432/bjj?sslmode=disable' go test -race ./...
 cd apps/web
 npm ci
 npm run lint
@@ -82,4 +93,3 @@ CI runs formatting enforcement, Go vet and race-enabled tests, frontend lint/tes
 - `db/migrations`: versioned PostgreSQL schema changes
 - `deploy`: development container definitions
 - `.github/workflows`: continuous integration
-

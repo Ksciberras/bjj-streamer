@@ -6,17 +6,24 @@ import (
 	"log/slog"
 	"net/url"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 )
 
 type Config struct {
-	Environment      string
-	HTTPAddr         string
-	DatabaseURL      string
-	DBConnectTimeout time.Duration
-	ShutdownTimeout  time.Duration
-	LogLevel         slog.Level
+	Environment         string
+	HTTPAddr            string
+	DatabaseURL         string
+	DBConnectTimeout    time.Duration
+	ShutdownTimeout     time.Duration
+	LogLevel            slog.Level
+	AuthCookieSecure    bool
+	InvitationTTL       time.Duration
+	SessionIdleTTL      time.Duration
+	SessionAbsoluteTTL  time.Duration
+	LoginRateLimit      int
+	InvitationRateLimit int
 }
 
 func Load() (Config, error) {
@@ -43,6 +50,18 @@ func load(lookup func(string) (string, bool)) (Config, error) {
 	}
 	cfg.DBConnectTimeout = duration(lookup, "DB_CONNECT_TIMEOUT", 5*time.Second, &errs)
 	cfg.ShutdownTimeout = duration(lookup, "SHUTDOWN_TIMEOUT", 10*time.Second, &errs)
+	cfg.InvitationTTL = duration(lookup, "INVITATION_TTL", 24*time.Hour, &errs)
+	cfg.SessionIdleTTL = duration(lookup, "SESSION_IDLE_TTL", 12*time.Hour, &errs)
+	cfg.SessionAbsoluteTTL = duration(lookup, "SESSION_ABSOLUTE_TTL", 7*24*time.Hour, &errs)
+	if cfg.SessionIdleTTL > cfg.SessionAbsoluteTTL {
+		errs = append(errs, fmt.Errorf("SESSION_IDLE_TTL must not exceed SESSION_ABSOLUTE_TTL"))
+	}
+	cfg.AuthCookieSecure = boolean(lookup, "AUTH_COOKIE_SECURE", cfg.Environment == "production", &errs)
+	if cfg.Environment == "production" && !cfg.AuthCookieSecure {
+		errs = append(errs, fmt.Errorf("AUTH_COOKIE_SECURE must be true in production"))
+	}
+	cfg.LoginRateLimit = positiveInt(lookup, "LOGIN_RATE_LIMIT", 10, &errs)
+	cfg.InvitationRateLimit = positiveInt(lookup, "INVITATION_RATE_LIMIT", 10, &errs)
 
 	switch strings.ToLower(value(lookup, "LOG_LEVEL", "info")) {
 	case "debug":
@@ -58,6 +77,29 @@ func load(lookup func(string) (string, bool)) (Config, error) {
 	}
 
 	return cfg, errors.Join(errs...)
+}
+
+func boolean(lookup func(string) (string, bool), key string, fallback bool, errs *[]error) bool {
+	raw, ok := lookup(key)
+	if !ok {
+		return fallback
+	}
+	parsed, err := strconv.ParseBool(strings.TrimSpace(raw))
+	if err != nil {
+		*errs = append(*errs, fmt.Errorf("%s must be true or false", key))
+		return fallback
+	}
+	return parsed
+}
+
+func positiveInt(lookup func(string) (string, bool), key string, fallback int, errs *[]error) int {
+	raw := value(lookup, key, strconv.Itoa(fallback))
+	parsed, err := strconv.Atoi(raw)
+	if err != nil || parsed <= 0 {
+		*errs = append(*errs, fmt.Errorf("%s must be a positive integer", key))
+		return fallback
+	}
+	return parsed
 }
 
 func value(lookup func(string) (string, bool), key, fallback string) string {

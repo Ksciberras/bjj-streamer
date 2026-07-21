@@ -16,7 +16,9 @@ type Pinger interface {
 	Ping(context.Context) error
 }
 
-func New(logger *slog.Logger, db Pinger) http.Handler {
+type Routes interface{ Register(*http.ServeMux) }
+
+func New(logger *slog.Logger, db Pinger, routes ...Routes) http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, _ *http.Request) {
 		writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
@@ -30,6 +32,9 @@ func New(logger *slog.Logger, db Pinger) http.Handler {
 		}
 		writeJSON(w, http.StatusOK, map[string]string{"status": "ready"})
 	})
+	for _, route := range routes {
+		route.Register(mux)
+	}
 	return requestLogging(logger, mux)
 }
 

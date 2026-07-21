@@ -11,6 +11,24 @@ permissions:
 jobs:
   backend:
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_DB: bjj_test
+          POSTGRES_USER: bjj
+          POSTGRES_PASSWORD: bjj
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U bjj -d bjj_test"
+          --health-interval 2s
+          --health-timeout 3s
+          --health-retries 15
+    env:
+      APP_ENV: test
+      DATABASE_URL: postgres://bjj:bjj@localhost:5432/bjj_test?sslmode=disable
+      TEST_DATABASE_URL: postgres://bjj:bjj@localhost:5432/bjj_test?sslmode=disable
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
@@ -19,6 +37,7 @@ jobs:
           cache: true
       - run: test -z "$(gofmt -l .)"
       - run: go vet ./...
+      - run: go run ./cmd/migrate up
       - run: go test -race ./...
 
   frontend:
@@ -48,4 +67,3 @@ jobs:
       - run: curl --fail http://localhost:8080/readyz
       - if: always()
         run: docker compose down --volumes
-

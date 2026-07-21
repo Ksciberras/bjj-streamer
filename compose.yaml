@@ -1,6 +1,8 @@
 services:
   db:
     image: postgres:17-alpine
+    ports:
+      - "127.0.0.1:5432:5432"
     environment:
       POSTGRES_DB: bjj
       POSTGRES_USER: bjj
@@ -22,6 +24,12 @@ services:
       APP_ENV: development
       DATABASE_URL: postgres://bjj:bjj@db:5432/bjj?sslmode=disable
       LOG_LEVEL: info
+      AUTH_COOKIE_SECURE: "false"
+      INVITATION_TTL: 24h
+      SESSION_IDLE_TTL: 12h
+      SESSION_ABSOLUTE_TTL: 168h
+      LOGIN_RATE_LIMIT: 10
+      INVITATION_RATE_LIMIT: 10
     depends_on:
       db:
         condition: service_healthy
