@@ -1,0 +1,21 @@
+{$DOMAIN} {
+	encode zstd gzip
+
+	@api path /api/* /healthz /readyz
+	reverse_proxy @api api:8080 {
+		header_up X-Real-IP {remote_host}
+	}
+	reverse_proxy web:8080
+
+	header {
+		-Server
+		X-Content-Type-Options nosniff
+		X-Frame-Options DENY
+		Referrer-Policy same-origin
+	}
+
+	log {
+		output stdout
+		format json
+	}
+}

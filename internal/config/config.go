@@ -12,18 +12,24 @@ import (
 )
 
 type Config struct {
-	Environment         string
-	HTTPAddr            string
-	DatabaseURL         string
-	DBConnectTimeout    time.Duration
-	ShutdownTimeout     time.Duration
-	LogLevel            slog.Level
-	AuthCookieSecure    bool
-	InvitationTTL       time.Duration
-	SessionIdleTTL      time.Duration
-	SessionAbsoluteTTL  time.Duration
-	LoginRateLimit      int
-	InvitationRateLimit int
+	Environment          string
+	HTTPAddr             string
+	DatabaseURL          string
+	DBConnectTimeout     time.Duration
+	ShutdownTimeout      time.Duration
+	LogLevel             slog.Level
+	AuthCookieSecure     bool
+	SessionIdleTTL       time.Duration
+	SessionAbsoluteTTL   time.Duration
+	LoginRateLimit       int
+	ObjectEndpoint       string
+	ObjectPublicEndpoint string
+	ObjectRegion         string
+	ObjectBucket         string
+	ObjectAccessKey      string
+	ObjectSecretKey      string
+	ObjectPathStyle      bool
+	UploadURLTTL         time.Duration
 }
 
 func Load() (Config, error) {
@@ -50,7 +56,6 @@ func load(lookup func(string) (string, bool)) (Config, error) {
 	}
 	cfg.DBConnectTimeout = duration(lookup, "DB_CONNECT_TIMEOUT", 5*time.Second, &errs)
 	cfg.ShutdownTimeout = duration(lookup, "SHUTDOWN_TIMEOUT", 10*time.Second, &errs)
-	cfg.InvitationTTL = duration(lookup, "INVITATION_TTL", 24*time.Hour, &errs)
 	cfg.SessionIdleTTL = duration(lookup, "SESSION_IDLE_TTL", 12*time.Hour, &errs)
 	cfg.SessionAbsoluteTTL = duration(lookup, "SESSION_ABSOLUTE_TTL", 7*24*time.Hour, &errs)
 	if cfg.SessionIdleTTL > cfg.SessionAbsoluteTTL {
@@ -61,7 +66,27 @@ func load(lookup func(string) (string, bool)) (Config, error) {
 		errs = append(errs, fmt.Errorf("AUTH_COOKIE_SECURE must be true in production"))
 	}
 	cfg.LoginRateLimit = positiveInt(lookup, "LOGIN_RATE_LIMIT", 10, &errs)
-	cfg.InvitationRateLimit = positiveInt(lookup, "INVITATION_RATE_LIMIT", 10, &errs)
+	cfg.ObjectEndpoint = value(lookup, "OBJECT_ENDPOINT", "http://localhost:9000")
+	if parsed, err := url.Parse(cfg.ObjectEndpoint); err != nil || parsed.Scheme == "" || parsed.Host == "" {
+		errs = append(errs, fmt.Errorf("OBJECT_ENDPOINT must be a valid URL"))
+	}
+	cfg.ObjectPublicEndpoint = value(lookup, "OBJECT_PUBLIC_ENDPOINT", cfg.ObjectEndpoint)
+	if parsed, err := url.Parse(cfg.ObjectPublicEndpoint); err != nil || parsed.Scheme == "" || parsed.Host == "" {
+		errs = append(errs, fmt.Errorf("OBJECT_PUBLIC_ENDPOINT must be a valid URL"))
+	}
+	cfg.ObjectRegion = value(lookup, "OBJECT_REGION", "us-east-1")
+	cfg.ObjectBucket = value(lookup, "OBJECT_BUCKET", "bjj-videos")
+	cfg.ObjectAccessKey = value(lookup, "OBJECT_ACCESS_KEY", "minioadmin")
+	cfg.ObjectSecretKey = value(lookup, "OBJECT_SECRET_KEY", "minioadmin")
+	if cfg.Environment == "production" {
+		for _, key := range []string{"OBJECT_ENDPOINT", "OBJECT_PUBLIC_ENDPOINT", "OBJECT_REGION", "OBJECT_BUCKET", "OBJECT_ACCESS_KEY", "OBJECT_SECRET_KEY"} {
+			if configured, ok := lookup(key); !ok || strings.TrimSpace(configured) == "" {
+				errs = append(errs, fmt.Errorf("%s is required in production", key))
+			}
+		}
+	}
+	cfg.ObjectPathStyle = boolean(lookup, "OBJECT_PATH_STYLE", false, &errs)
+	cfg.UploadURLTTL = duration(lookup, "UPLOAD_URL_TTL", 15*time.Minute, &errs)
 
 	switch strings.ToLower(value(lookup, "LOG_LEVEL", "info")) {
 	case "debug":

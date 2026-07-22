@@ -1,242 +1,226 @@
-# BJJ Streaming Platform — Agent Instructions
+# BJJ Streaming MVP — Agent Instructions
 
-## Mission
+## Goal
 
-Build an invite-only, cloud-hosted BJJ instructional platform for a small group
-of friends and training partners. The product is a learning system, not merely
-a video gallery: it must combine secure streaming with technique organization,
-timestamped notes, bookmarks, progress, and study queues.
+Build the smallest useful private BJJ instructional platform for 5–20 known
+users. The MVP must prove one loop:
 
-The expected initial scale is 5–20 users and approximately 1 TiB or less of
-media. Optimize for correctness, privacy, recoverability, and a simple operating
-model. Do not optimize prematurely for large-scale public traffic.
+```text
+admin/instructor uploads MP4 -> user finds it -> watches it -> resumes later ->
+adds a timestamped note
+```
 
-## Fixed product decisions
+Do not build a production platform before this loop works and is used.
 
-- Hosting: DigitalOcean; the user cannot self-host.
-- Compute: one Droplet initially.
-- Media: a private DigitalOcean Spaces bucket.
-- Application: React + TypeScript frontend, Go backend, PostgreSQL.
-- Deployment: Docker Compose behind Caddy.
-- Processing: a Go worker invoking `ffprobe` and FFmpeg.
-- Registration: invite-only. There is no public sign-up.
+## Fixed MVP choices
+
+- React + TypeScript + Vite frontend.
+- Go HTTP API.
+- PostgreSQL.
+- DigitalOcean Spaces for private video storage.
+- One DigitalOcean Droplet when deployment is ready.
+- Docker Compose for local development and deployment.
+- Caddy for HTTPS in deployment.
+- Invite-only in practice: an admin creates user accounts. There is no public
+  registration or email invitation workflow in the MVP.
 - Roles: `admin`, `instructor`, and `student`.
-- Uploading: only admins and instructors may upload.
-- Libraries: every user has a private personal library; authorized groups can
-  also access licensed shared libraries.
-- Initial playback: browser-compatible MP4 using HTTP range requests and
-  short-lived signed object-storage URLs.
-- HLS, native applications, offline downloads, AI transcription, payments, and
-  public sharing are post-MVP features.
+- Only admins and instructors can upload videos.
+- Admins can manage every video. Instructors can manage only their own videos.
+- Every authenticated user can watch shared videos.
+- Private videos can be watched only by their uploader and admins.
+- Accept browser-compatible `.mp4` files only. Do not add FFmpeg, transcoding,
+  HLS, or a background worker in the MVP.
+- Use one presigned PUT upload per file. Set a documented maximum file size of
+  5 GiB. Multipart and resumable upload are post-MVP.
 
-Do not replace these decisions without recording the reason in an architecture
-decision record and obtaining user approval.
+## Content rules
 
-## Legal and content constraints
-
-The platform must not facilitate copyright infringement or DRM circumvention.
-Every media asset must declare one of these content bases:
-
-- `self_created`
-- `licensed_for_group`
-- `personal_purchase`
-
-Enforce this invariant in backend code and, where practical, the database:
+Every video has:
 
 ```text
-personal_purchase -> personal library only
+visibility: shared | private
+content_basis: self_created | licensed_for_group | personal_purchase
 ```
 
-A checkbox or frontend warning is not enforcement. Reject invalid sharing on
-the server. Do not implement download-site scraping, DRM removal, credential
-sharing, or mechanisms intended to conceal unauthorized redistribution.
-
-## Roles and authorization
-
-Authorization is determined by all three factors:
+Enforce this backend rule:
 
 ```text
-global role + library membership + resource ownership
+personal_purchase -> visibility must be private
 ```
 
-### Admin
+Do not implement DRM removal, scraping, credential sharing, or public links.
+Only self-created or properly licensed material may be shared.
 
-- Invite, disable, and manage users.
-- Assign global roles.
-- Create shared libraries and manage their memberships.
-- Upload, edit, publish, archive, and administer permitted content.
-- View audit history.
+## MVP features
 
-### Instructor
+### Accounts
 
-- Upload only to shared libraries to which they are assigned as an instructor,
-  or to their own personal library.
-- Edit, publish, and archive their own content within those libraries.
-- Cannot edit another instructor's content unless explicitly made its owner.
-- Cannot manage global users, roles, or unrelated libraries.
+- Bootstrap the first admin from a CLI command or environment variables.
+- Admin can create, disable, and reset passwords for known users.
+- Users log in with email and password.
+- Passwords use Argon2id.
+- Authentication uses secure HTTP-only session cookies.
+- There is no self-registration, email delivery, password recovery email, MFA,
+  OAuth, or organization management in the MVP.
 
-### Student
+### Video catalog
 
-- View published content in assigned libraries.
-- Create private notes, bookmarks, playback progress, and study queues.
-- Cannot upload, publish, edit catalog data, or view drafts.
+- Admin or instructor creates a video record.
+- Required metadata: title, instructor name, visibility, content basis, and
+  object key.
+- Optional metadata: instructional/series name, chapter name, description, and
+  comma-separated tags.
+- Browse all accessible videos.
+- Search title, instructor, instructional name, and tags.
+- Admin can edit/archive anything.
+- Instructor can edit/archive only videos they uploaded.
+- Students have read-only catalog access.
 
-Frontend visibility is not security. Every protected backend operation must
-call a central authorization policy. Prefer `404` over `403` when revealing a
-resource's existence would disclose private information.
+Do not build separate position, technique, volume, alias, or relationship
+tables yet. Plain metadata and tags are enough to validate the product.
 
-## Architecture
+### Upload
 
-Use a modular monolith:
+1. Admin or instructor creates an upload request.
+2. API checks the role and validates filename, MIME type, size, visibility, and
+   content basis.
+3. API generates the object key and a short-lived presigned PUT URL.
+4. Browser uploads the MP4 directly to Spaces.
+5. Browser tells the API that upload finished.
+6. API verifies the object exists and marks the video ready.
+
+Video bytes must not pass through the Go API. Students cannot call upload
+endpoints. Spaces credentials must never reach the frontend.
+
+### Playback and study
+
+- API checks access and returns a short-lived presigned GET URL.
+- Browser plays the MP4 with the native `<video>` element.
+- Save playback position periodically and on pause/navigation.
+- Resume from the saved position.
+- Users can add, edit, delete, and click timestamped private notes.
+- Clicking a note seeks the player to that timestamp.
+- Progress and notes are always private per user.
+
+Bookmarks, study queues, completion rules, shared notes, transcripts, and
+recommendations are post-MVP.
+
+## Minimal data model
+
+Use only the tables needed for the working loop:
+
+```text
+users
+- id
+- email
+- password_hash
+- role: admin | instructor | student
+- disabled_at
+- created_at
+
+sessions
+- id_hash
+- user_id
+- expires_at
+- created_at
+
+videos
+- id
+- uploaded_by_user_id
+- title
+- instructor_name
+- instructional_name nullable
+- chapter_name nullable
+- description
+- tags text[] or normalized simple tags
+- visibility: shared | private
+- content_basis
+- object_key
+- original_filename
+- mime_type
+- byte_size
+- status: pending_upload | ready | archived
+- created_at
+- updated_at
+
+playback_progress
+- user_id
+- video_id
+- position_seconds
+- updated_at
+
+notes
+- id
+- user_id
+- video_id
+- timestamp_seconds
+- body
+- created_at
+- updated_at
+```
+
+Prefer database constraints for enum values, non-negative timestamps, and the
+personal-purchase visibility rule.
+
+## Minimal architecture
 
 ```text
 React web app -> Go API -> PostgreSQL
       |             |
-      +-------> private Spaces bucket
-                         ^
-                         |
-                   Go/FFmpeg worker
+      +-------> private DigitalOcean Spaces
 ```
-
-Large media bytes must not pass through the Go API. The browser uploads
-directly to Spaces using short-lived presigned multipart requests. Playback is
-authorized by the API and delivered from Spaces using short-lived signed GET
-URLs.
 
 Suggested repository structure:
 
 ```text
-apps/
-  web/
-cmd/
-  api/
-  worker/
+apps/web/
+cmd/api/
 internal/
-  auth/
-  authorization/
-  catalog/
-  learning/
-  libraries/
-  media/
-  users/
-db/
-  migrations/
+db/migrations/
 deploy/
-docs/
+compose.yaml
+README.md
 ```
 
-Do not introduce Kubernetes, microservices, Redis, a message broker, or a
-managed database unless measured requirements justify them and the user
-approves the operational cost.
+Keep the Go application a small modular monolith. Do not add Redis, queues,
+workers, microservices, Kubernetes, Terraform, generated API clients, a design
+system, or generic repository abstractions.
 
-## Domain model
+## Security floor
 
-Identity and access:
+The MVP is simple, not careless.
 
-```text
-users
-sessions
-invitations
-libraries
-library_members
-audit_events
-```
+- Enforce permissions in the Go API, never only in React.
+- Use parameterized database queries.
+- Use Argon2id password hashing.
+- Store only a hash of each session token in PostgreSQL.
+- Use HTTP-only, Secure-in-production, SameSite cookies.
+- Add CSRF protection to state-changing cookie-authenticated requests.
+- Rate-limit login attempts with a simple in-process limiter. Document that it
+  resets on restart and is sufficient only for the single-Droplet MVP.
+- Generate object keys on the server.
+- Keep the Spaces bucket private.
+- Return short-lived signed URLs only after authorization.
+- Never log passwords, session tokens, Spaces secrets, or signed URL query
+  strings.
+- Validate upload MIME type, extension, and declared size. Verification after
+  upload is limited in this MVP; document that browser compatibility is the
+  uploader's responsibility.
 
-Catalog:
+## How agents should work
 
-```text
-instructors
-instructionals
-volumes
-chapters
-positions
-techniques
-technique_aliases
-chapter_positions
-chapter_techniques
-```
+- Read this file before editing.
+- Implement one milestone at a time and stop at its gate.
+- Do not add future features or abstractions speculatively.
+- Prefer a complete working path over broad scaffolding.
+- Add tests around authorization and data isolation.
+- Use migrations for schema changes.
+- Do not edit an already-applied migration; create a new one.
+- Update the README with exact commands.
+- Run applicable verification and report commands actually run.
+- Do not claim Docker or cloud behavior was tested if it was not.
 
-Media:
-
-```text
-media_assets
-multipart_uploads
-processing_jobs
-```
-
-Personal learning data:
-
-```text
-playback_progress
-notes
-bookmarks
-study_queue_items
-```
-
-All learning records are scoped by `user_id`. Private is the default. Preserve
-learning records if a media rendition is replaced or catalog content is
-archived.
-
-## Media lifecycle
-
-Uploads follow:
-
-```text
-created -> uploading -> uploaded -> inspecting
-                 |                      |
-                 +-> cancelled          +-> ready
-                 +-> expired            +-> processing -> ready
-                                        +-> failed
-```
-
-Publication follows:
-
-```text
-draft -> processing -> ready -> published -> archived
-```
-
-The worker should make this decision:
-
-```text
-H.264 + AAC + MP4                 -> retain for direct playback
-compatible codecs, wrong container -> remux without re-encoding
-incompatible codecs                -> transcode to H.264/AAC MP4
-DRM-protected or unreadable        -> reject with a clear failure
-```
-
-Originals must never be overwritten. Worker jobs must be idempotent, retryable,
-and protected by expiring leases. Run one expensive FFmpeg job at a time on the
-initial Droplet. Remove temporary files after both success and failure.
-
-## Engineering rules
-
-- Work on one milestone at a time.
-- Inspect the repository and existing instructions before editing.
-- Do not implement future milestones speculatively.
-- Keep authorization in explicit, testable backend policies.
-- Validate state transitions centrally; handlers must not update status fields
-  arbitrarily.
-- Use database constraints for invariants that the database can enforce.
-- Use migrations for every schema change; never edit an applied migration.
-- Generate object keys on the server. Never accept arbitrary storage paths from
-  clients.
-- Never expose Spaces credentials, password hashes, session tokens, presigned
-  URL query strings, or secrets in logs.
-- Use secure HTTP-only cookies for sessions. Rotate session IDs on login and
-  privilege changes, and support immediate revocation.
-- Require CSRF protection for cookie-authenticated state-changing requests.
-- Use Argon2id for passwords and rate-limit login and invitation endpoints.
-- Use structured logs with request and correlation IDs.
-- Keep production PostgreSQL and worker control endpoints off the public
-  internet.
-- Prefer archiving over destructive deletion. Permanent deletion needs an
-  explicit retention policy and auditable operation.
-
-## Verification rules
-
-Every milestone must include implementation, migrations where relevant, tests,
-documentation, and a verification report. Run all applicable commands before
-claiming completion, typically:
+Typical verification:
 
 ```bash
 go fmt ./...
@@ -248,232 +232,166 @@ npm run build
 docker compose config
 ```
 
-Do not report a command as passing if it was not run. If environment limitations
-prevent verification, report exactly what remains unverified.
+## Four milestones
 
-Prioritize tests for:
+### Milestone 1 — Local app with login
 
-- Authorization policies and resource enumeration.
-- Session rotation, expiry, revocation, and CSRF.
-- Content-basis sharing restrictions.
-- Upload state transitions, retries, and cleanup.
-- Worker leases, crashes, and idempotency.
-- Signed playback authorization and expiry.
-- Per-user isolation of notes, bookmarks, queues, and progress.
+Build:
 
-## Milestone execution protocol
+- Go API, React frontend, PostgreSQL, migrations, and Docker Compose.
+- Configuration loading.
+- Health endpoint.
+- Users and sessions tables.
+- First-admin bootstrap command.
+- Login, logout, current-user endpoint, and protected app shell.
+- Minimal tests for password hashing, sessions, and protected routes.
+- README with one-command local startup.
 
-For each milestone:
+Gate:
 
-1. Start from the latest accepted main branch.
-2. Create a focused branch such as `milestone/03-authorization`.
-3. Restate the milestone scope and inspect relevant existing code.
-4. Write or update the design notes and threat model before security-sensitive
-   implementation.
-5. Implement the smallest complete slice.
-6. Add unit, integration, and end-to-end tests proportional to risk.
-7. Run formatting, linting, tests, builds, and configuration validation.
-8. Summarize changed files, decisions, verification results, and remaining
-   risks.
-9. Stop. Do not begin the next milestone automatically.
+- A clean checkout starts locally using documented commands.
+- The admin can be bootstrapped and can log in through the browser.
+- Anonymous users cannot access the app.
+- Relevant tests and builds pass.
 
-One focused pull request and commit series per milestone is preferred. Never
-hide unrelated cleanup inside a milestone.
+Stop after this gate. Do not add videos yet.
 
-## Milestones and gates
+### Milestone 2 — Catalog and direct MP4 upload
 
-### 1. Foundation
+Build:
 
-Implement the Go API and worker entry points, React application, PostgreSQL,
-migrations, Docker Compose, configuration validation, structured logging,
-health/readiness endpoints, graceful shutdown, tests, CI, and development
-documentation.
+- Admin user-management screen for creating and disabling known users.
+- Videos table and content constraints.
+- Video create/edit/archive endpoints and screens.
+- Role and ownership checks.
+- Presigned PUT upload to a local S3-compatible service in development and
+  DigitalOcean Spaces in deployment.
+- Upload progress and completion verification.
+- Accessible video list and basic search.
 
-Gate: a clean checkout starts with documented commands, a clean database
-migrates successfully, and backend/frontend builds and tests pass. Do not add
-placeholder business endpoints.
+Gate:
 
-### 2. Invite-only authentication
+- Admin and instructor can upload a compatible MP4 directly to object storage.
+- Student upload requests are rejected by the API.
+- Instructor cannot edit another instructor's video.
+- `personal_purchase` cannot be shared.
+- All users see shared ready videos; private videos remain private.
 
-Document the authentication threat model. Implement first-admin bootstrap,
-expiring single-use invitations, Argon2id passwords, secure server-side
-sessions, login/logout, rotation, revocation, rate limiting, CSRF protection,
-and a minimal authentication UI.
+Stop after this gate. Do not add transcoding or multipart upload.
 
-Gate: public signup is impossible; invalid, expired, and consumed invitations
-fail; revoked sessions stop immediately; secrets never appear in logs.
+### Milestone 3 — Playback, progress, and notes
 
-### 3. Libraries and authorization
+Build:
 
-Write the permission matrix first. Implement automatic personal libraries,
-shared libraries, membership administration, instructor assignments, central
-authorization policies, audit events, and content-basis enforcement.
+- Authorized short-lived playback URLs.
+- Native responsive video player.
+- Per-user saved and resumed playback position.
+- Timestamped private notes with click-to-seek.
+- Basic mobile layout.
+- Tests proving progress and note isolation.
 
-Gate: students cannot upload; instructors cannot access unassigned libraries;
-users cannot enumerate inaccessible resources; personal purchases cannot be
-shared. Exhaustive policy and integration tests are mandatory. Do not proceed
-until this gate is reviewed manually.
+Gate:
 
-### 4. Instructional catalog
+- Two users can watch the same video with independent progress and notes.
+- Unauthorized users cannot obtain a playback URL.
+- Seeking works in current Safari and Chromium browsers.
+- A user can leave, return, resume, and jump to a saved note.
 
-Implement instructors, instructionals, volumes, chapters, hierarchical
-positions, techniques, aliases, ordering, draft/published/archived states,
-search, filters, instructor editing, and student browsing.
+This is the functional MVP. Use it locally before deploying.
 
-Gate: instructors can edit only owned content in assigned libraries; students
-cannot see drafts; search respects membership; archive operations preserve
-learning references.
+### Milestone 4 — Simple deployment and pilot
 
-### 5. Direct multipart uploads
+Build only what is needed to run the proven MVP:
 
-Implement an S3-compatible storage boundary, local object-storage development
-support, multipart initiation, short-lived part signing, resume, completion,
-cancellation, validation, progress, and stale-upload cleanup.
+- Production Dockerfiles and Compose file.
+- Caddy HTTPS configuration.
+- Database backup and restore scripts.
+- Deployment README.
+- Basic health monitoring instructions.
 
-Gate: a realistically large upload travels directly from browser to object
-storage, survives interruption, and cannot be initiated by a student or an
-unassigned instructor. Storage credentials never reach React.
+Manual deployment target:
 
-### 6. Inspection and processing
+- One small DigitalOcean Droplet.
+- One private Spaces bucket.
+- One domain or subdomain.
+- PostgreSQL running privately in Docker Compose on the Droplet.
 
-Implement durable processing jobs, leases, retries, `ffprobe` inspection,
-compatibility classification, remuxing, H.264/AAC transcoding, thumbnails,
-progress, failure reporting, and temporary-file cleanup.
+Gate:
 
-Gate: originals are preserved; jobs are idempotent; worker crashes recover;
-failed jobs can be retried; publishing is impossible before media is ready.
+- Site works over HTTPS.
+- PostgreSQL is not publicly exposed.
+- Spaces objects are private.
+- A real backup is restored successfully.
+- Pilot with one admin, one instructor, and two students using a small,
+  unquestionably authorized set of MP4s.
 
-### 7. Secure playback
+## Explicitly deferred
 
-Implement playback authorization, short-lived signed GET URLs, MP4 range
-playback, responsive player controls, per-user progress, resume, and completion.
-
-Gate: unauthorized users cannot obtain URLs; drafts are unavailable to
-students; seeking works without a full download; Safari and Chromium playback
-are tested; progress is isolated per user.
-
-### 8. Learning workflow
-
-Implement timestamped private notes, click-to-seek, bookmarks, personal study
-queues, continue watching, recent activity, completion, position/technique
-browsing, and cross-instructional search.
-
-Gate: learning data is private; timestamps are within media duration; two users
-have independent state; search exposes only authorized published content.
-
-### 9. Production deployment and recovery
-
-Implement production containers and Compose, Caddy/HTTPS, non-root operation,
-secret injection, backups, retention, tested restoration, monitoring, alerts,
-deployment, rollback, security headers, and runbooks.
-
-Gate: PostgreSQL and Spaces are private; only intended ports are reachable; a
-fresh Droplet can be rebuilt; a backup has actually been restored; no production
-secret exists in Git or container images.
-
-### 10. Controlled pilot
-
-Pilot with one admin, one instructor, two students, and a small set of
-self-created or properly licensed media. Exercise invitations, upload,
-processing, publication, playback, private notes, revocation, worker failure,
-backup, and restore.
-
-Gate: the pilot runs for two weeks without a permission leak; failures and
-costs are understood; users actually return to the study features. Only pilot
-evidence should determine whether the next feature is transcription, HLS,
-casting, or something else.
-
-## Explicit MVP exclusions
-
-- Public registration
-- Payments and subscriptions
-- Native mobile or TV applications
-- Offline downloads
+- Email invitations and password recovery
+- Per-group library membership
+- Multiple organizations or gyms
+- FFmpeg, `ffprobe`, transcoding, remuxing, thumbnails, and workers
+- Multipart/resumable uploads and files larger than 5 GiB
+- HLS/adaptive bitrate streaming
+- Position and technique graphs
+- Bookmarks and study queues
 - AI transcription
-- HLS/adaptive streaming
-- Livestreaming
-- Public share links
-- Social feeds and comments
-- Automated media scraping
-- DRM circumvention
-- Kubernetes and microservices
+- Native mobile/TV apps and offline downloads
+- Payments, public registration, and public sharing
+- Audit-event UI
+- Terraform, Kubernetes, microservices, Redis, and message queues
+- Complex CI/CD and zero-downtime deployment
 
-## Tasks requiring the user to perform or approve manually
+Add a deferred feature only after the working MVP exposes a concrete problem it
+solves.
 
-Agents must not pretend these tasks were completed merely because code or
-documentation was generated.
+## Manual tasks for the user
 
-### Before development
+### Before Milestone 1
 
-- Create the Git repository and choose its visibility.
-- Confirm the initial DigitalOcean region based on the users' location.
-- Estimate current media volume, largest file size, and expected monthly viewing
-  hours; these numbers influence storage and transfer limits.
-- Decide whether instructors may self-publish or require admin approval.
-- Decide the retention period before archived media can be permanently deleted.
-- Confirm that every shared media item is self-created or licensed for the
-  intended group. Keep licence records outside or alongside the platform.
+- Create the private Git repository and place this `AGENTS.md` at its root.
+- Install Docker Desktop, Go, Node.js, and Git, or confirm Docker-only local
+  development is preferred.
+- Decide the bootstrap admin email.
 
-### DigitalOcean setup
+### Before Milestone 2
 
-- Create the DigitalOcean account/project and enable MFA.
-- Create the private Spaces bucket in the chosen region.
-- Create least-privilege Spaces access credentials for the application.
-- Keep root/account recovery credentials outside the application.
-- Create the Droplet only when the production milestone is ready.
-- Configure DigitalOcean firewall rules and DNS.
-- Set billing alerts and resource alerts.
-- Review current storage and outbound-transfer pricing before importing the full
-  library.
+- Create a DigitalOcean account/project and enable MFA, but do not create the
+  Droplet yet.
+- Create a private Spaces bucket in the region closest to the users.
+- Create least-privilege Spaces credentials for this bucket.
+- Put credentials in local environment variables, never in Git or prompts.
+- Prepare one small H.264/AAC MP4 for testing.
+- Confirm whether each test video is `self_created`, `licensed_for_group`, or a
+  private `personal_purchase`.
 
-Never paste long-lived production secrets into Codex prompts, issue trackers,
-commits, or chat. Put them directly into the approved secret store or production
-environment.
+### Before Milestone 4
 
-### Manual security review
+- Buy or choose the domain/subdomain.
+- Create the Droplet.
+- Configure DNS and the DigitalOcean firewall using the deployment guide.
+- Put production secrets directly on the server.
+- Set DigitalOcean billing and resource alerts.
+- Run and inspect a real database restore.
 
-- Review the Milestone 3 permission matrix and denial tests before allowing real
-  uploads.
-- Create separate test users for admin, instructor, and student roles.
-- Attempt horizontal privilege escalation by changing IDs in requests.
-- Verify that an instructor cannot upload to an unassigned library.
-- Verify that students cannot see draft titles, thumbnails, or media URLs.
-- Inspect browser cookies and network requests for exposed secrets.
-- Confirm that signed URLs expire and that the Spaces bucket has no public
-  listing or anonymous object access.
-- Rotate credentials immediately if they appear in Git, logs, or prompts.
+### Pilot
 
-### Deployment and recovery
+- Choose one instructor and two students.
+- Upload only a few clearly authorized videos.
+- Test on the phones and browsers people actually use.
+- Track whether users resume videos and create/revisit notes for two weeks.
+- Review DigitalOcean charges before importing the full library.
 
-- Purchase or configure the domain and DNS.
-- Supply production secrets directly in the deployment environment.
-- Apply firewall settings and verify them from an external network.
-- Enable and review monitoring alerts.
-- Download or provision the documented backup credentials.
-- Perform a real restore into a clean database and inspect representative data.
-- Test account recovery and admin session revocation.
-- Keep an independent copy of the recovery runbook.
+## Completion report
 
-### Pilot operation
+At the end of each milestone, report:
 
-- Choose the pilot instructor and two students.
-- Upload only a small, unquestionably authorized test library first.
-- Test desktop and mobile playback on the devices the group actually uses.
-- Collect concrete failures rather than feature requests alone.
-- Review weekly resource use and DigitalOcean charges.
-- Decide whether the platform is valuable based on repeat study behavior, not
-  merely successful video playback.
-
-## Completion reporting
-
-At the end of each task, agents should report:
-
-- Outcome first.
+- What now works.
 - Files and migrations changed.
-- Tests and commands actually run, with results.
-- Security or data-migration implications.
-- Manual steps still required from the user.
-- Any blocked or deliberately deferred work.
+- Tests and commands actually run.
+- Anything unverified.
+- Manual steps the user must perform.
+- Deferred problems discovered.
 
-Do not call a milestone complete while its acceptance gate or required manual
-verification is outstanding.
+Do not call a milestone complete until its gate passes. Do not begin the next
+milestone automatically.

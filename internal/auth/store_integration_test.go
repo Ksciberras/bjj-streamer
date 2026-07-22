@@ -20,11 +20,22 @@ func integrationStore(t *testing.T) (*Store, *pgxpool.Pool) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err = pool.Exec(context.Background(), `TRUNCATE sessions,invitations,users CASCADE`); err != nil {
-		pool.Close()
+	t.Cleanup(pool.Close)
+	connection, err := pool.Acquire(context.Background())
+	if err != nil {
 		t.Fatal(err)
 	}
-	t.Cleanup(pool.Close)
+	if _, err = connection.Exec(context.Background(), `SELECT pg_advisory_lock(8675309)`); err != nil {
+		connection.Release()
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		_, _ = connection.Exec(context.Background(), `SELECT pg_advisory_unlock(8675309)`)
+		connection.Release()
+	})
+	if _, err = pool.Exec(context.Background(), `TRUNCATE audit_events,library_members,libraries,sessions,invitations,users CASCADE`); err != nil {
+		t.Fatal(err)
+	}
 	return NewStore(pool), pool
 }
 
@@ -47,39 +58,6 @@ func TestBootstrapCanOnlyRunOnce(t *testing.T) {
 	hash, _ := HashPassword("another secure password")
 	if _, err := s.BootstrapAdmin(context.Background(), "other@example.com", hash); !errors.Is(err, ErrBootstrapComplete) {
 		t.Fatalf("got %v", err)
-	}
-}
-
-func TestInvitationIsExpiringAndSingleUse(t *testing.T) {
-	s, _ := integrationStore(t)
-	admin := bootstrap(t, s)
-	now := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
-	s.now = func() time.Time { return now }
-	token, _, err := s.CreateInvitation(context.Background(), "Student@Example.com", "student", admin.ID, time.Hour)
-	if err != nil {
-		t.Fatal(err)
-	}
-	hash, _ := HashPassword("student secure password")
-	user, err := s.AcceptInvitation(context.Background(), token, hash)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if user.Email != "student@example.com" {
-		t.Fatalf("email=%s", user.Email)
-	}
-	if _, err = s.AcceptInvitation(context.Background(), token, hash); !errors.Is(err, ErrInvalidInvitation) {
-		t.Fatalf("replay got %v", err)
-	}
-	expired, _, err := s.CreateInvitation(context.Background(), "late@example.com", "student", admin.ID, time.Hour)
-	if err != nil {
-		t.Fatal(err)
-	}
-	s.now = func() time.Time { return now.Add(2 * time.Hour) }
-	if _, err = s.AcceptInvitation(context.Background(), expired, hash); !errors.Is(err, ErrInvalidInvitation) {
-		t.Fatalf("expired got %v", err)
-	}
-	if _, err = s.AcceptInvitation(context.Background(), "not-a-token", hash); !errors.Is(err, ErrInvalidInvitation) {
-		t.Fatalf("invalid got %v", err)
 	}
 }
 

@@ -12,7 +12,7 @@ import (
 func TestLoginSessionAndCSRFFlow(t *testing.T) {
 	store, _ := integrationStore(t)
 	bootstrap(t, store)
-	handler, err := NewHandler(store, Settings{InvitationTTL: time.Hour, SessionIdleTTL: time.Hour, SessionAbsoluteTTL: 24 * time.Hour}, 10, 10)
+	handler, err := NewHandler(store, Settings{SessionIdleTTL: time.Hour, SessionAbsoluteTTL: 24 * time.Hour}, 10)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -37,25 +37,14 @@ func TestLoginSessionAndCSRFFlow(t *testing.T) {
 	if session == nil || csrf == nil || !session.HttpOnly || csrf.HttpOnly {
 		t.Fatal("secure cookie properties missing")
 	}
-	invite := jsonRequest(t, http.MethodPost, "/api/auth/invitations", map[string]string{"email": "student@example.com", "role": "student"})
-	invite.AddCookie(session)
+	logout := jsonRequest(t, http.MethodPost, "/api/auth/logout", map[string]string{})
+	logout.AddCookie(session)
 	denied := httptest.NewRecorder()
-	mux.ServeHTTP(denied, invite)
+	mux.ServeHTTP(denied, logout)
 	if denied.Code != http.StatusForbidden {
 		t.Fatalf("missing csrf status=%d", denied.Code)
 	}
-	invite = jsonRequest(t, http.MethodPost, "/api/auth/invitations", map[string]string{"email": "student@example.com", "role": "student"})
-	invite.AddCookie(session)
-	invite.Header.Set(csrfHeader, csrf.Value)
-	created := httptest.NewRecorder()
-	mux.ServeHTTP(created, invite)
-	if created.Code != http.StatusCreated {
-		t.Fatalf("invite status=%d body=%s", created.Code, created.Body.String())
-	}
-	if created.Header().Get("Cache-Control") != "no-store" {
-		t.Fatal("invitation response may be cached")
-	}
-	logout := jsonRequest(t, http.MethodPost, "/api/auth/logout", map[string]string{})
+	logout = jsonRequest(t, http.MethodPost, "/api/auth/logout", map[string]string{})
 	logout.AddCookie(session)
 	logout.Header.Set(csrfHeader, csrf.Value)
 	loggedOut := httptest.NewRecorder()
@@ -75,7 +64,7 @@ func TestLoginSessionAndCSRFFlow(t *testing.T) {
 func TestLoginRateLimitAndGenericFailure(t *testing.T) {
 	store, _ := integrationStore(t)
 	bootstrap(t, store)
-	handler, _ := NewHandler(store, Settings{SessionIdleTTL: time.Hour, SessionAbsoluteTTL: 24 * time.Hour}, 1, 10)
+	handler, _ := NewHandler(store, Settings{SessionIdleTTL: time.Hour, SessionAbsoluteTTL: 24 * time.Hour}, 1)
 	mux := http.NewServeMux()
 	handler.Register(mux)
 	for index, want := range []int{http.StatusUnauthorized, http.StatusTooManyRequests} {

@@ -10,11 +10,17 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/kyransciberras/bjj-streaming/internal/audit"
 	"github.com/kyransciberras/bjj-streaming/internal/auth"
 	"github.com/kyransciberras/bjj-streaming/internal/config"
 	"github.com/kyransciberras/bjj-streaming/internal/database"
 	"github.com/kyransciberras/bjj-streaming/internal/httpserver"
+	"github.com/kyransciberras/bjj-streaming/internal/learning"
+	"github.com/kyransciberras/bjj-streaming/internal/libraries"
 	"github.com/kyransciberras/bjj-streaming/internal/logging"
+	"github.com/kyransciberras/bjj-streaming/internal/objectstorage"
+	"github.com/kyransciberras/bjj-streaming/internal/users"
+	"github.com/kyransciberras/bjj-streaming/internal/videos"
 )
 
 func main() {
@@ -40,15 +46,26 @@ func run() error {
 	}
 	defer db.Close()
 	authHandler, err := auth.NewHandler(auth.NewStore(db), auth.Settings{
-		CookieSecure: cfg.AuthCookieSecure, InvitationTTL: cfg.InvitationTTL,
+		CookieSecure:   cfg.AuthCookieSecure,
 		SessionIdleTTL: cfg.SessionIdleTTL, SessionAbsoluteTTL: cfg.SessionAbsoluteTTL,
-	}, cfg.LoginRateLimit, cfg.InvitationRateLimit)
+	}, cfg.LoginRateLimit)
 	if err != nil {
 		return err
 	}
+	userStore := users.NewStore(db)
+	userHandler := users.NewHandler(userStore, authHandler)
+	libraryHandler := libraries.NewHandler(libraries.NewStore(db), userStore, authHandler)
+	auditHandler := audit.NewHandler(audit.NewStore(db), authHandler)
+	objects, err := objectstorage.New(context.Background(), cfg.ObjectEndpoint, cfg.ObjectPublicEndpoint, cfg.ObjectRegion, cfg.ObjectBucket, cfg.ObjectAccessKey, cfg.ObjectSecretKey, cfg.ObjectPathStyle, cfg.UploadURLTTL)
+	if err != nil {
+		return err
+	}
+	videoStore := videos.NewStore(db)
+	videoHandler := videos.NewHandler(videoStore, objects, authHandler)
+	learningHandler := learning.NewHandler(learning.NewStore(db), videoStore, objects, authHandler)
 
 	server := &http.Server{
-		Addr: cfg.HTTPAddr, Handler: httpserver.New(logger, db, authHandler),
+		Addr: cfg.HTTPAddr, Handler: httpserver.New(logger, db, authHandler, userHandler, libraryHandler, auditHandler, videoHandler, learningHandler),
 		ReadHeaderTimeout: 5 * time.Second, ReadTimeout: 15 * time.Second,
 		WriteTimeout: 15 * time.Second, IdleTimeout: 60 * time.Second,
 	}

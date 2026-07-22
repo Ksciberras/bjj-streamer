@@ -16,27 +16,24 @@ const csrfCookie = "bjj_csrf"
 const csrfHeader = "X-CSRF-Token"
 
 type Handler struct {
-	store             *Store
-	settings          Settings
-	loginLimiter      *RateLimiter
-	invitationLimiter *RateLimiter
-	dummyHash         string
+	store        *Store
+	settings     Settings
+	loginLimiter *RateLimiter
+	dummyHash    string
 }
 
-func NewHandler(store *Store, settings Settings, loginLimit, invitationLimit int) (*Handler, error) {
+func NewHandler(store *Store, settings Settings, loginLimit int) (*Handler, error) {
 	dummy, err := HashPassword("not-a-real-password")
 	if err != nil {
 		return nil, err
 	}
-	return &Handler{store: store, settings: settings, loginLimiter: NewRateLimiter(loginLimit, time.Minute), invitationLimiter: NewRateLimiter(invitationLimit, time.Minute), dummyHash: dummy}, nil
+	return &Handler{store: store, settings: settings, loginLimiter: NewRateLimiter(loginLimit, time.Minute), dummyHash: dummy}, nil
 }
 
 func (h *Handler) Register(mux *http.ServeMux) {
 	mux.Handle("POST /api/auth/login", noStore(http.HandlerFunc(h.login)))
 	mux.Handle("POST /api/auth/logout", noStore(http.HandlerFunc(h.logout)))
 	mux.Handle("GET /api/auth/session", noStore(http.HandlerFunc(h.currentSession)))
-	mux.Handle("POST /api/auth/invitations", noStore(http.HandlerFunc(h.createInvitation)))
-	mux.Handle("POST /api/auth/invitations/accept", noStore(http.HandlerFunc(h.acceptInvitation)))
 }
 
 func (h *Handler) login(w http.ResponseWriter, r *http.Request) {
@@ -108,71 +105,6 @@ func (h *Handler) currentSession(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{"user": session.User})
 }
 
-func (h *Handler) createInvitation(w http.ResponseWriter, r *http.Request) {
-	if !h.invitationLimiter.Allow(r.URL.Path + ":" + clientIP(r)) {
-		rateLimited(w)
-		return
-	}
-	_, session, ok := h.authenticated(w, r)
-	if !ok {
-		return
-	}
-	if !validCSRF(r, session.CSRFHash) {
-		writeJSON(w, http.StatusForbidden, map[string]string{"error": "invalid csrf token"})
-		return
-	}
-	if session.User.Role != "admin" {
-		writeJSON(w, http.StatusNotFound, map[string]string{"error": "not found"})
-		return
-	}
-	var input struct {
-		Email string `json:"email"`
-		Role  string `json:"role"`
-	}
-	if decodeJSON(r, &input) != nil || !ValidEmail(input.Email) || !validRole(input.Role) {
-		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid invitation"})
-		return
-	}
-	token, expires, err := h.store.CreateInvitation(r.Context(), input.Email, input.Role, session.User.ID, h.settings.InvitationTTL)
-	if err != nil {
-		serverError(w)
-		return
-	}
-	writeJSON(w, http.StatusCreated, map[string]any{"token": token, "expires_at": expires})
-}
-
-func (h *Handler) acceptInvitation(w http.ResponseWriter, r *http.Request) {
-	if !h.invitationLimiter.Allow(r.URL.Path + ":" + clientIP(r)) {
-		rateLimited(w)
-		return
-	}
-	var input struct {
-		Token    string `json:"token"`
-		Password string `json:"password"`
-	}
-	if decodeJSON(r, &input) != nil || input.Token == "" || ValidatePassword(input.Password) != nil {
-		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid or expired invitation"})
-		return
-	}
-	hash, err := HashPassword(input.Password)
-	if err != nil {
-		serverError(w)
-		return
-	}
-	user, err := h.store.AcceptInvitation(r.Context(), input.Token, hash)
-	if err != nil {
-		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid or expired invitation"})
-		return
-	}
-	token, csrf, expires, err := h.store.CreateSession(r.Context(), user.ID, cookieValue(r, sessionCookie), h.settings)
-	if err != nil {
-		serverError(w)
-		return
-	}
-	h.setCookies(w, token, csrf, expires)
-	writeJSON(w, http.StatusCreated, map[string]any{"user": user})
-}
-
 func (h *Handler) authenticated(w http.ResponseWriter, r *http.Request) (string, Session, bool) {
 	token := cookieValue(r, sessionCookie)
 	if token == "" {
@@ -186,6 +118,18 @@ func (h *Handler) authenticated(w http.ResponseWriter, r *http.Request) (string,
 		return "", Session{}, false
 	}
 	return token, session, true
+}
+
+func (h *Handler) Authenticate(w http.ResponseWriter, r *http.Request) (string, Session, bool) {
+	return h.authenticated(w, r)
+}
+
+func (h *Handler) RequireCSRF(w http.ResponseWriter, r *http.Request, session Session) bool {
+	if validCSRF(r, session.CSRFHash) {
+		return true
+	}
+	writeJSON(w, http.StatusForbidden, map[string]string{"error": "invalid csrf token"})
+	return false
 }
 
 func (h *Handler) setCookies(w http.ResponseWriter, token, csrf string, expires time.Time) {
@@ -210,7 +154,6 @@ func cookieValue(r *http.Request, name string) string {
 	}
 	return cookie.Value
 }
-func validRole(role string) bool { return role == "admin" || role == "instructor" || role == "student" }
 func ValidEmail(email string) bool {
 	parsed, err := mail.ParseAddress(strings.TrimSpace(email))
 	return err == nil && strings.EqualFold(parsed.Address, strings.TrimSpace(email))

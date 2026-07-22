@@ -2,36 +2,41 @@
 
 ## Scope and assets
 
-Milestone 2 protects account credentials, invitation capabilities, authenticated sessions, and administrative invitation creation. It does not grant library or content access; resource authorization is Milestone 3.
+Authentication protects account credentials, authenticated sessions, and administrative account management. There is no public registration or active invitation endpoint. An administrator creates accounts for known users and communicates initial passwords outside the application.
 
-The browser is untrusted. PostgreSQL and the API are trusted components on the private application network. TLS termination is required in production. Email delivery is outside this milestone: an administrator must transfer the one-time invitation URL through a trusted channel.
+The browser is untrusted. PostgreSQL and the API are trusted components on the private application network. TLS termination is required in production.
 
 ## Threats and controls
 
 | Threat | Control | Residual risk |
 | --- | --- | --- |
-| Public account creation | No signup route; account creation requires a random, stored-as-hash invitation token | Anyone possessing an unconsumed token may use it |
-| Credential database theft | Argon2id with per-password random salt; passwords never logged or returned | Weak user-chosen passwords remain guessable at Argon2 cost |
-| Session database theft | 256-bit random session tokens; only SHA-256 hashes stored; HTTP-only cookie | An active browser cookie can still be stolen by endpoint compromise |
-| Session fixation | A new session identifier is created after every login; any presented prior session is revoked | Concurrent login sessions remain allowed intentionally |
-| CSRF | Strict SameSite session cookie plus per-session random CSRF token required in a header for authenticated mutations | Same-site script injection bypasses CSRF; XSS prevention remains essential |
-| Brute force and token probing | Per-IP and per-identity in-memory rate limits; uniform invalid-credential response | Limits reset on process restart; acceptable for one initial Droplet |
-| Invitation replay | Transactional row lock and consumed timestamp; token is stored only as a hash | Administrator must transfer the URL securely |
-| Expired/revoked access | Expiry and revocation are checked from PostgreSQL on every authenticated request | Database availability is required for every authenticated request |
-| User enumeration | Login and invitation acceptance return generic failures; normalized email is not disclosed | Timing differences are reduced with a dummy password hash |
-| Secret leakage through logs | Handlers never log bodies, cookies, passwords, invitation tokens, or query strings | Infrastructure access logs must retain the same restriction |
-| Bootstrap takeover | Interactive command succeeds only while the users table is empty and uses a serializable transaction/advisory lock | Host/database administrators remain trusted |
+| Public account creation | Account creation is available only to an authenticated administrator with a valid CSRF token | Administrators are trusted to create only known users |
+| Credential database theft | Argon2id with a random salt per password; passwords are never logged or returned | Weak user-chosen passwords remain guessable at the configured Argon2 cost |
+| Session database theft | 256-bit random session tokens; only SHA-256 hashes are stored; session cookie is HTTP-only | An active browser cookie can still be stolen by endpoint compromise |
+| Session fixation | Login creates a new session and revokes any presented prior session | Concurrent sessions remain allowed intentionally |
+| CSRF | Strict SameSite session cookie plus a per-session CSRF token required for authenticated mutations | Same-site script injection bypasses CSRF; XSS prevention remains essential |
+| Brute force | Per-IP and per-identity in-process login limits plus uniform invalid-credential responses | Limits reset at restart; acceptable only for one initial Droplet |
+| Disabled or stale access | Session state, expiry, revocation, and user disabled state are checked in PostgreSQL on every authenticated request | Database availability is required |
+| Password-reset persistence | Resetting a password revokes every active session for the target user in the same transaction | An administrator can intentionally take over an account |
+| Privilege-change persistence | Role and disabled-state changes revoke active sessions transactionally | Administrators remain trusted |
+| User enumeration | Login returns a generic failure and uses a dummy Argon2 hash for missing accounts | Administrative account pages intentionally reveal users to administrators |
+| Secret leakage through logs | Handlers do not log request bodies, cookies, passwords, session tokens, or query strings | Infrastructure logging must follow the same restriction |
+| Bootstrap takeover | Interactive bootstrap succeeds only while the users table is empty, protected by a serializable transaction and advisory lock | Host/database administrators remain trusted |
 
 ## Security invariants
 
-- Passwords, raw session tokens, raw CSRF tokens, and raw invitation tokens are never persisted or logged.
-- Disabled users and revoked, expired, or idle sessions fail immediately on their next request.
-- Invitation consumption and user creation occur in one transaction.
-- Cookie-authenticated state changes require both a valid session and CSRF token.
-- Authentication errors do not reveal whether an email, invitation, or session exists.
-- Production refuses to issue authentication cookies without the secure-cookie configuration.
+- Passwords and raw session and CSRF tokens are never persisted or logged.
+- Disabled users and revoked, expired, or idle sessions fail on their next request.
+- Cookie-authenticated state changes require a valid session and CSRF token.
+- Account creation, password resets, role changes, and disable operations are administrator-only.
+- Password resets and authorization changes revoke target-user sessions atomically.
+- The final enabled administrator cannot be disabled or demoted.
+- Production refuses to issue authentication cookies without Secure enabled.
+
+## Legacy compatibility
+
+Migration `000002` created an `invitations` table. The table and any stored rows are preserved because applied migrations and stored data are immutable during this refactor. No HTTP route consumes or creates invitations now.
 
 ## Deferred risks
 
-Distributed rate limiting, MFA, account recovery, email delivery, global user/role management, privilege-change session revocation, and authorization for domain resources are outside Milestone 2. Privilege-change revocation must be added with role management in Milestone 3.
-
+MFA, email delivery, password-recovery email, distributed rate limiting, and organization management are outside the MVP.

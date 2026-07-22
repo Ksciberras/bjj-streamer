@@ -15,6 +15,32 @@ services:
     volumes:
       - postgres-data:/var/lib/postgresql/data
 
+  storage:
+    image: minio/minio:RELEASE.2025-07-23T15-54-02Z
+    command: ["server", "/data", "--console-address", ":9001"]
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+      MINIO_API_CORS_ALLOW_ORIGIN: http://localhost:5173
+    ports:
+      - "127.0.0.1:9000:9000"
+      - "127.0.0.1:9001:9001"
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 2s
+      timeout: 3s
+      retries: 15
+    volumes:
+      - object-data:/data
+
+  storage-init:
+    image: minio/mc:RELEASE.2025-07-21T05-28-08Z
+    entrypoint: ["/bin/sh", "-c"]
+    command: ["mc alias set local http://storage:9000 minioadmin minioadmin && mc mb --ignore-existing local/bjj-videos"]
+    depends_on:
+      storage:
+        condition: service_healthy
+
   migrate:
     build:
       context: .
@@ -25,11 +51,17 @@ services:
       DATABASE_URL: postgres://bjj:bjj@db:5432/bjj?sslmode=disable
       LOG_LEVEL: info
       AUTH_COOKIE_SECURE: "false"
-      INVITATION_TTL: 24h
       SESSION_IDLE_TTL: 12h
       SESSION_ABSOLUTE_TTL: 168h
       LOGIN_RATE_LIMIT: 10
-      INVITATION_RATE_LIMIT: 10
+      OBJECT_ENDPOINT: http://storage:9000
+      OBJECT_PUBLIC_ENDPOINT: http://localhost:9000
+      OBJECT_REGION: us-east-1
+      OBJECT_BUCKET: bjj-videos
+      OBJECT_ACCESS_KEY: minioadmin
+      OBJECT_SECRET_KEY: minioadmin
+      OBJECT_PATH_STYLE: "true"
+      UPLOAD_URL_TTL: 15m
     depends_on:
       db:
         condition: service_healthy
@@ -44,20 +76,12 @@ services:
     depends_on:
       migrate:
         condition: service_completed_successfully
+      storage-init:
+        condition: service_completed_successfully
     ports:
       - "8080:8080"
     init: true
     stop_grace_period: 15s
-
-  worker:
-    build:
-      context: .
-      dockerfile: deploy/Dockerfile.worker
-    environment: *app-environment
-    depends_on:
-      migrate:
-        condition: service_completed_successfully
-    init: true
 
   web:
     build:
@@ -71,3 +95,4 @@ services:
 
 volumes:
   postgres-data:
+  object-data:

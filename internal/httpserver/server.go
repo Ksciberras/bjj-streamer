@@ -45,6 +45,7 @@ func requestLogging(logger *slog.Logger, next http.Handler) http.Handler {
 		if requestID == "" || len(requestID) > 128 {
 			requestID = newRequestID()
 		}
+		r.Header.Set(requestIDHeader, requestID)
 		w.Header().Set(requestIDHeader, requestID)
 		recorder := &statusRecorder{ResponseWriter: w, status: http.StatusOK}
 		next.ServeHTTP(recorder, r)

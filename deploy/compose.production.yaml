@@ -1,0 +1,84 @@
+name: bjj-streaming
+
+services:
+  db:
+    image: postgres:17-alpine
+    env_file: .env.production
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    networks: [backend]
+
+  migrate:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile.migrate
+    command: ["up"]
+    env_file: .env.production
+    depends_on:
+      db:
+        condition: service_healthy
+    networks: [backend]
+
+  api:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile.api
+    env_file: .env.production
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    expose: ["8080"]
+    init: true
+    restart: unless-stopped
+    stop_grace_period: 15s
+    networks: [backend, frontend]
+
+  web:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile.web
+    depends_on:
+      api:
+        condition: service_started
+    expose: ["8080"]
+    restart: unless-stopped
+    networks: [frontend]
+
+  caddy:
+    image: caddy:2.10.2-alpine
+    env_file: .env.production
+    depends_on:
+      api:
+        condition: service_started
+      web:
+        condition: service_started
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    restart: unless-stopped
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    networks: [frontend]
+
+networks:
+  backend:
+    internal: true
+  frontend:
+
+volumes:
+  postgres-data:
+  caddy-data:
+  caddy-config:

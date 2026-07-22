@@ -17,7 +17,6 @@ type Session struct {
 
 type Settings struct {
 	CookieSecure       bool
-	InvitationTTL      time.Duration
 	SessionIdleTTL     time.Duration
 	SessionAbsoluteTTL time.Duration
 }

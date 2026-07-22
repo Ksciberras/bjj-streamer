@@ -11,7 +11,6 @@ import (
 )
 
 var ErrInvalidCredentials = errors.New("invalid credentials")
-var ErrInvalidInvitation = errors.New("invalid invitation")
 var ErrUnauthenticated = errors.New("unauthenticated")
 var ErrBootstrapComplete = errors.New("bootstrap already completed")
 
@@ -43,44 +42,6 @@ func (s *Store) BootstrapAdmin(ctx context.Context, email, passwordHash string) 
 	var user User
 	err = tx.QueryRow(ctx, `INSERT INTO users (email,password_hash,role) VALUES ($1,$2,'admin') RETURNING id,email,role`, normalizeEmail(email), passwordHash).Scan(&user.ID, &user.Email, &user.Role)
 	if err != nil {
-		return User{}, err
-	}
-	if err = tx.Commit(ctx); err != nil {
-		return User{}, err
-	}
-	return user, nil
-}
-
-func (s *Store) CreateInvitation(ctx context.Context, email, role string, invitedBy string, ttl time.Duration) (string, time.Time, error) {
-	token, hash, err := newToken()
-	if err != nil {
-		return "", time.Time{}, err
-	}
-	expires := s.now().Add(ttl)
-	_, err = s.db.Exec(ctx, `INSERT INTO invitations (email,role,token_hash,invited_by,expires_at,created_at) VALUES ($1,$2,$3,$4,$5,$6)`, normalizeEmail(email), role, hash, invitedBy, expires, s.now())
-	return token, expires, err
-}
-
-func (s *Store) AcceptInvitation(ctx context.Context, token, passwordHash string) (User, error) {
-	tx, err := s.db.Begin(ctx)
-	if err != nil {
-		return User{}, err
-	}
-	defer tx.Rollback(ctx)
-	var id, email, role string
-	err = tx.QueryRow(ctx, `SELECT id,email,role FROM invitations WHERE token_hash=$1 AND consumed_at IS NULL AND expires_at>$2 FOR UPDATE`, tokenHash(token), s.now()).Scan(&id, &email, &role)
-	if errors.Is(err, pgx.ErrNoRows) {
-		return User{}, ErrInvalidInvitation
-	}
-	if err != nil {
-		return User{}, err
-	}
-	var user User
-	err = tx.QueryRow(ctx, `INSERT INTO users (email,password_hash,role) VALUES ($1,$2,$3) RETURNING id,email,role`, email, passwordHash, role).Scan(&user.ID, &user.Email, &user.Role)
-	if err != nil {
-		return User{}, ErrInvalidInvitation
-	}
-	if _, err = tx.Exec(ctx, `UPDATE invitations SET consumed_at=$1 WHERE id=$2`, s.now(), id); err != nil {
 		return User{}, err
 	}
 	if err = tx.Commit(ctx); err != nil {

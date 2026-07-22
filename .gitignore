@@ -1,4 +1,6 @@
 .env
+deploy/.env.production
+deploy/backups/
 .DS_Store
 coverage/
 apps/web/dist/
