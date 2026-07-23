@@ -12,6 +12,16 @@ type ManageVideosProps = {
 }
 
 export function ManageVideos({ videos, onUpdate, onError }: ManageVideosProps) {
+  async function deleteVideo(video: Video) {
+    if (!window.confirm(`Delete “${video.title}” from the library? Its stored file and study history will be retained.`)) return
+    try {
+      await api(`/api/videos/${video.id}`, { method: 'DELETE', body: '{}' })
+      await onUpdate()
+    } catch (reason) {
+      onError(errorMessage(reason, 'Unable to delete video'))
+    }
+  }
+
   async function uploadThumbnail(video: Video, file: File) {
     if (file.size === 0) return
     try {
@@ -44,10 +54,10 @@ export function ManageVideos({ videos, onUpdate, onError }: ManageVideosProps) {
         body: JSON.stringify({
           title: data.get('title'),
           instructor_name: data.get('instructor_name'),
-          instructional_name: video.instructional_name ?? null,
-          chapter_name: video.chapter_name ?? null,
-          description: video.description,
-          tags: video.tags,
+          instructional_name: data.get('instructional_name') || null,
+          chapter_name: data.get('chapter_name') || null,
+          description: data.get('description'),
+          tags: String(data.get('tags') ?? '').split(',').map((tag) => tag.trim()).filter(Boolean),
           visibility: data.get('visibility'),
           content_basis: data.get('content_basis'),
           archived: data.get('archived') === 'on',
@@ -91,9 +101,10 @@ export function ManageVideos({ videos, onUpdate, onError }: ManageVideosProps) {
                 <td>{labelize(video.content_basis)}</td>
                 <td>{labelize(video.status)}</td>
                 <td>
-                  <details className="row-editor">
-                    <summary>Edit</summary>
-                    <form onSubmit={(event) => void updateVideo(event, video)}>
+                  <div className="manage-row-actions">
+                    <details className="row-editor">
+                      <summary>Edit</summary>
+                      <form onSubmit={(event) => void updateVideo(event, video)}>
                       <label>
                         Title
                         <input name="title" defaultValue={video.title} required />
@@ -101,6 +112,22 @@ export function ManageVideos({ videos, onUpdate, onError }: ManageVideosProps) {
                       <label>
                         Instructor
                         <input name="instructor_name" defaultValue={video.instructor_name} required />
+                      </label>
+                      <label>
+                        Instructional / series
+                        <input name="instructional_name" defaultValue={video.instructional_name} />
+                      </label>
+                      <label>
+                        Chapter
+                        <input name="chapter_name" defaultValue={video.chapter_name} />
+                      </label>
+                      <label>
+                        Description
+                        <textarea name="description" defaultValue={video.description} />
+                      </label>
+                      <label>
+                        Tags, comma separated
+                        <input name="tags" defaultValue={video.tags.join(', ')} />
                       </label>
                       <label>
                         Visibility
@@ -117,9 +144,6 @@ export function ManageVideos({ videos, onUpdate, onError }: ManageVideosProps) {
                           <option value="personal_purchase">Personal purchase</option>
                         </select>
                       </label>
-                      <label className="check">
-                        <input name="archived" type="checkbox" /> Archive video
-                      </label>
                       <label>
                         Replace thumbnail
                         <input
@@ -132,8 +156,10 @@ export function ManageVideos({ videos, onUpdate, onError }: ManageVideosProps) {
                         />
                       </label>
                       <button type="submit">Save</button>
-                    </form>
-                  </details>
+                      </form>
+                    </details>
+                    <button type="button" className="danger-button" onClick={() => void deleteVideo(video)}>Delete</button>
+                  </div>
                 </td>
               </tr>
             ))}

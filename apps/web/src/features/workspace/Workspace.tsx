@@ -61,7 +61,7 @@ export function Workspace({ user, logout }: WorkspaceProps) {
   }
 
   async function refreshCourses() {
-    setCourses((await api('/api/courses')).courses)
+    setCourses((await api('/api/courses')).courses ?? [])
   }
 
   async function refreshStudy() {
@@ -76,7 +76,7 @@ export function Workspace({ user, logout }: WorkspaceProps) {
       .then(([body, courseBody, studyBody]) => {
         if (!cancelled) {
           setVideos(body.videos)
-          setCourses(courseBody.courses)
+          setCourses(courseBody.courses ?? [])
           setWatchLater(studyBody.watch_later ?? [])
           setStudyNotes(studyBody.notes ?? [])
           void loadProgress(body.videos)
@@ -237,6 +237,7 @@ export function Workspace({ user, logout }: WorkspaceProps) {
         <UploadScreen
           user={user}
           videos={videos}
+          courses={courses}
           onUploaded={async () => {
             await Promise.all([refreshVideos(), refreshCourses(), refreshStudy()])
             setNotice('Upload complete. The video is ready to study.')

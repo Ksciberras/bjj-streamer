@@ -181,6 +181,8 @@ kbd { padding: .15rem .32rem; border: 1px solid var(--border-strong); border-rad
 .note-actions button { padding: .48rem .65rem; font-size: .68rem; }
 .danger-button { color: var(--danger); border-color: #673936; background: transparent; }
 .danger-button:hover { color: #fff; background: #6d302d; }
+.manage-row-actions { display: flex; align-items: center; gap: .5rem; }
+.manage-row-actions > button { width: auto; white-space: nowrap; }
 .secondary-button { color: var(--muted); border-color: var(--border-strong); background: transparent; }
 .secondary-button:hover { color: var(--text); background: var(--surface-subtle); }
 
@@ -636,6 +638,20 @@ td small { margin-top: .2rem; }
 .course-create-button {
   width: 100%;
 }
+.course-cancel-button { width: 100%; margin-top: .5rem; }
+.manage-course-list { display: grid; gap: 0; border-top: 1px solid var(--border); }
+.manage-course-row {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: .85rem 0;
+  border-bottom: 1px solid var(--border);
+}
+.manage-course-row > div:first-child { display: grid; min-width: 0; gap: .2rem; }
+.manage-course-row strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: .8rem; }
+.manage-course-row span { color: var(--muted); font-size: .7rem; }
 
 .course-order {
   display: grid;
@@ -913,6 +929,9 @@ td small { margin-top: .2rem; }
 }
 
 @media (max-width: 700px) {
+  .manage-course-row { align-items: flex-start; flex-direction: column; }
+  .manage-course-row .manage-row-actions { width: 100%; }
+  .manage-course-row .manage-row-actions button { flex: 1; }
   .gym-create-form {
     grid-template-columns: 1fr;
   }

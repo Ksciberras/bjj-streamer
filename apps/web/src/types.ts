@@ -38,6 +38,7 @@ export type CourseSummary = {
   instructor_name: string
   video_count: number
   organization_id?: string
+  can_manage?: boolean
 }
 
 export type CourseVideo = Video & {

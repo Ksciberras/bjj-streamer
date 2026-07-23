@@ -1,16 +1,18 @@
 import { useState, type FormEvent } from 'react'
 import { api, errorMessage } from '../../lib/api'
 import { initials } from '../../lib/format'
-import type { Video } from '../../types'
+import type { Course, Video } from '../../types'
 
 type CourseBuilderProps = {
   videos: Video[]
+  course?: Course
   onComplete: () => Promise<void>
   onError: (message: string) => void
+  onCancel?: () => void
 }
 
-export function CourseBuilder({ videos, onComplete, onError }: CourseBuilderProps) {
-  const [selected, setSelected] = useState<Video[]>([])
+export function CourseBuilder({ videos, course, onComplete, onError, onCancel }: CourseBuilderProps) {
+  const [selected, setSelected] = useState<Video[]>(course?.videos ?? [])
   const [saving, setSaving] = useState(false)
   const [query, setQuery] = useState('')
   const [instructor, setInstructor] = useState('')
@@ -52,14 +54,16 @@ export function CourseBuilder({ videos, onComplete, onError }: CourseBuilderProp
     setSaving(true)
     onError('')
     try {
-      await api('/api/courses', {
-        method: 'POST',
+      await api(course ? `/api/courses/${course.id}` : '/api/courses', {
+        method: course ? 'PATCH' : 'POST',
         body: JSON.stringify({
           title: data.get('title'),
           instructor_name: data.get('instructor_name'),
           videos: selected.map((video) => ({
             video_id: video.id,
-            chapter_name: video.chapter_name || video.title,
+            chapter_name: ('course_chapter_name' in video && typeof video.course_chapter_name === 'string'
+              ? video.course_chapter_name
+              : video.chapter_name) || video.title,
           })),
         }),
       })
@@ -67,7 +71,7 @@ export function CourseBuilder({ videos, onComplete, onError }: CourseBuilderProp
       setSelected([])
       await onComplete()
     } catch (reason) {
-      onError(errorMessage(reason, 'Unable to create course'))
+      onError(errorMessage(reason, course ? 'Unable to update course' : 'Unable to create course'))
     } finally {
       setSaving(false)
     }
@@ -77,14 +81,14 @@ export function CourseBuilder({ videos, onComplete, onError }: CourseBuilderProp
     <form className="course-builder" onSubmit={submit}>
       <div className="course-builder-heading">
         <div>
-          <h2>Build a course</h2>
-          <p>Choose videos, then arrange them in playback order.</p>
+          <h2>{course ? 'Edit course' : 'Build a course'}</h2>
+          <p>{course ? 'Update the details, chapters, and playback order.' : 'Choose videos, then arrange them in playback order.'}</p>
         </div>
         <span>{selected.length} selected</span>
       </div>
       <div className="field-grid course-details">
-        <label>Course title<input name="title" required maxLength={200} disabled={saving} placeholder="e.g. New Wave Half Guard" /></label>
-        <label>Instructor<input name="instructor_name" required maxLength={200} disabled={saving} placeholder="Instructor name" /></label>
+        <label>Course title<input name="title" required maxLength={200} disabled={saving} defaultValue={course?.title} placeholder="e.g. New Wave Half Guard" /></label>
+        <label>Instructor<input name="instructor_name" required maxLength={200} disabled={saving} defaultValue={course?.instructor_name} placeholder="Instructor name" /></label>
       </div>
       <div className="course-builder-layout">
         <section className="course-picker" aria-labelledby="choose-videos-title">
@@ -142,7 +146,10 @@ export function CourseBuilder({ videos, onComplete, onError }: CourseBuilderProp
               ))}
             </ol>
           ) : <div className="course-sequence-empty"><strong>No videos selected</strong><span>Pick video cards to build the course.</span></div>}
-          <button className="course-create-button" type="submit" disabled={saving || !selected.length}>{saving ? 'Creating course…' : `Create course with ${selected.length} ${selected.length === 1 ? 'video' : 'videos'}`}</button>
+          <button className="course-create-button" type="submit" disabled={saving || !selected.length}>
+            {saving ? 'Saving course…' : course ? 'Save course changes' : `Create course with ${selected.length} ${selected.length === 1 ? 'video' : 'videos'}`}
+          </button>
+          {course && <button className="secondary-button course-cancel-button" type="button" disabled={saving} onClick={onCancel}>Cancel editing</button>}
         </section>
       </div>
     </form>

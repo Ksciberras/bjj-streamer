@@ -40,6 +40,7 @@ func (h *Handler) Register(mux *http.ServeMux) {
 	mux.HandleFunc("POST /api/videos/upload-requests", h.createUpload)
 	mux.HandleFunc("POST /api/videos/{id}/complete", h.complete)
 	mux.HandleFunc("PATCH /api/videos/{id}", h.update)
+	mux.HandleFunc("DELETE /api/videos/{id}", h.delete)
 	mux.HandleFunc("POST /api/videos/{id}/thumbnail-upload-request", h.createThumbnailUpload)
 	mux.HandleFunc("POST /api/videos/{id}/thumbnail-complete", h.completeThumbnail)
 	mux.HandleFunc("GET /api/videos/{id}/thumbnail", h.thumbnail)
@@ -185,6 +186,30 @@ func (h *Handler) update(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"video": updated})
+}
+
+func (h *Handler) delete(w http.ResponseWriter, r *http.Request) {
+	session, ok := h.session(w, r, true)
+	if !ok {
+		return
+	}
+	video, err := h.store.Get(r.Context(), r.PathValue("id"))
+	if err != nil || !h.store.CanManage(video, session.User.ID, session.User.Role, session.User.OrganizationID, session.User.IsPlatformOwner) {
+		notFound(w)
+		return
+	}
+	input := CreateInput{
+		Title: video.Title, InstructorName: video.InstructorName,
+		InstructionalName: video.InstructionalName, ChapterName: video.ChapterName,
+		Description: video.Description, Tags: video.Tags, Visibility: video.Visibility,
+		ContentBasis: video.ContentBasis, ObjectKey: video.ObjectKey,
+		OriginalFilename: video.OriginalFilename, MIMEType: video.MIMEType, ByteSize: video.ByteSize,
+	}
+	if _, err = h.store.Update(r.Context(), session.User.ID, video.ID, r.Header.Get("X-Request-ID"), input, true); err != nil {
+		serverError(w)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
 }
 
 type thumbnailInput struct {

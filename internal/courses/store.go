@@ -111,3 +111,44 @@ func (s *Store) Create(ctx context.Context, actorID, title, instructor string, m
 	}
 	return course, nil
 }
+
+func (s *Store) Update(ctx context.Context, id, title, instructor string, members []Membership) (Course, error) {
+	tx, err := s.db.Begin(ctx)
+	if err != nil {
+		return Course{}, err
+	}
+	defer tx.Rollback(ctx)
+
+	var course Course
+	err = tx.QueryRow(ctx, `UPDATE courses SET title=$2,instructor_name=$3,updated_at=CURRENT_TIMESTAMP WHERE id=$1 RETURNING id,created_by_user_id,organization_id,title,instructor_name,created_at,updated_at`, id, title, instructor).
+		Scan(&course.ID, &course.CreatedByUserID, &course.OrganizationID, &course.Title, &course.InstructorName, &course.CreatedAt, &course.UpdatedAt)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return Course{}, ErrNotFound
+	}
+	if err != nil {
+		return Course{}, err
+	}
+	if _, err = tx.Exec(ctx, `DELETE FROM course_videos WHERE course_id=$1`, id); err != nil {
+		return Course{}, err
+	}
+	for _, member := range members {
+		if _, err = tx.Exec(ctx, `INSERT INTO course_videos(course_id,video_id,sequence_number,chapter_title) VALUES($1,$2,$3,$4)`, id, member.VideoID, member.Sequence, member.ChapterTitle); err != nil {
+			return Course{}, err
+		}
+	}
+	if err = tx.Commit(ctx); err != nil {
+		return Course{}, err
+	}
+	return course, nil
+}
+
+func (s *Store) Delete(ctx context.Context, id string) error {
+	result, err := s.db.Exec(ctx, `DELETE FROM courses WHERE id=$1`, id)
+	if err != nil {
+		return err
+	}
+	if result.RowsAffected() == 0 {
+		return ErrNotFound
+	}
+	return nil
+}

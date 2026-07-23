@@ -4,14 +4,16 @@ import { errorMessage } from '../../lib/api'
 import { formatBytes } from '../../lib/format'
 import { generateVideoThumbnail } from '../../lib/videoThumbnail'
 import { uploadVideo, type VideoMetadata } from '../../lib/videoUpload'
-import type { User, Video } from '../../types'
+import type { Course, CourseSummary, User, Video } from '../../types'
 import { ManageVideos } from '../videos/ManageVideos'
 import { BatchUploadForm } from './BatchUploadForm'
 import { CourseBuilder } from './CourseBuilder'
+import { ManageCourses } from './ManageCourses'
 
 type UploadScreenProps = {
   user: User
   videos: Video[]
+  courses: CourseSummary[]
   onUploaded: () => Promise<void>
   onError: (value: string) => void
   onUpdate: () => Promise<void>
@@ -20,6 +22,7 @@ type UploadScreenProps = {
 export function UploadScreen({
   user,
   videos,
+  courses,
   onUploaded,
   onError,
   onUpdate,
@@ -29,6 +32,7 @@ export function UploadScreen({
   const [progress, setProgress] = useState<number | null>(null)
   const [state, setState] = useState<'idle' | 'preparing' | 'uploading' | 'success' | 'error'>('idle')
   const [mode, setMode] = useState<'single' | 'batch' | 'course'>('single')
+  const [editingCourse, setEditingCourse] = useState<Course | undefined>()
 
   async function upload(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -85,6 +89,7 @@ export function UploadScreen({
   const manageable = videos.filter(
     (video) => user.role === 'admin' || video.uploaded_by_user_id === user.id,
   )
+  const manageableCourses = courses.filter((course) => course.can_manage)
 
   return (
     <div className="screen">
@@ -103,10 +108,23 @@ export function UploadScreen({
             {user.role === 'admin' && (
               <button type="button" className={mode === 'batch' ? 'active' : ''} onClick={() => setMode('batch')}>Course batch</button>
             )}
-            <button type="button" className={mode === 'course' ? 'active' : ''} onClick={() => setMode('course')}>Build from library</button>
+            <button type="button" className={mode === 'course' ? 'active' : ''} onClick={() => {
+              setEditingCourse(undefined)
+              setMode('course')
+            }}>Build from library</button>
           </div>
           {mode === 'course'
-            ? <CourseBuilder videos={manageable} onComplete={onUploaded} onError={onError} />
+            ? <CourseBuilder
+                key={editingCourse?.id ?? 'new-course'}
+                videos={manageable}
+                course={editingCourse}
+                onComplete={async () => {
+                  setEditingCourse(undefined)
+                  await onUploaded()
+                }}
+                onCancel={() => setEditingCourse(undefined)}
+                onError={onError}
+              />
             : mode === 'batch' && user.role === 'admin'
             ? <BatchUploadForm onComplete={onUploaded} onError={onError} />
             : <form className="upload-form" onSubmit={upload}>
@@ -199,6 +217,16 @@ export function UploadScreen({
             </div>
             </form>}
         </section>
+        <ManageCourses
+          courses={manageableCourses}
+          onEdit={(course) => {
+            setEditingCourse(course)
+            setMode('course')
+            window.scrollTo({ top: 0, behavior: 'smooth' })
+          }}
+          onUpdate={onUploaded}
+          onError={onError}
+        />
         <ManageVideos videos={manageable} onUpdate={onUpdate} onError={onError} />
       </div>
     </div>

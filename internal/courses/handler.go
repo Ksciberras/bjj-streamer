@@ -26,6 +26,8 @@ func (h *Handler) Register(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/courses", h.list)
 	mux.HandleFunc("POST /api/courses", h.create)
 	mux.HandleFunc("GET /api/courses/{id}", h.get)
+	mux.HandleFunc("PATCH /api/courses/{id}", h.update)
+	mux.HandleFunc("DELETE /api/courses/{id}", h.delete)
 }
 
 type courseVideo struct {
@@ -77,6 +79,14 @@ func (h *Handler) visibleCourse(r *http.Request, session auth.Session, course Co
 	return result, canManage || len(result.Videos) > 0, nil
 }
 
+func canManageCourse(session auth.Session, course Course) bool {
+	return session.User.IsPlatformOwner ||
+		(session.User.OrganizationID != nil &&
+			course.OrganizationID == *session.User.OrganizationID &&
+			(session.User.Role == "admin" ||
+				(session.User.Role == "instructor" && course.CreatedByUserID == session.User.ID)))
+}
+
 func (h *Handler) list(w http.ResponseWriter, r *http.Request) {
 	session, ok := h.session(w, r, false)
 	if !ok {
@@ -98,6 +108,7 @@ func (h *Handler) list(w http.ResponseWriter, r *http.Request) {
 			result = append(result, map[string]any{
 				"id": course.ID, "created_by_user_id": course.CreatedByUserID, "title": course.Title,
 				"instructor_name": course.InstructorName, "organization_id": course.OrganizationID, "video_count": len(visible.Videos),
+				"can_manage": canManageCourse(session, course),
 			})
 		}
 	}
@@ -144,39 +155,9 @@ func (h *Handler) create(w http.ResponseWriter, r *http.Request) {
 		notFound(w)
 		return
 	}
-	var input createInput
-	if decode(r, &input) != nil {
-		badRequest(w)
+	input, members, ok := h.validatedInput(w, r, session)
+	if !ok {
 		return
-	}
-	input.Title = strings.TrimSpace(input.Title)
-	input.InstructorName = strings.TrimSpace(input.InstructorName)
-	if len(input.Title) == 0 || len(input.Title) > 200 || len(input.InstructorName) == 0 || len(input.InstructorName) > 200 || len(input.Videos) == 0 || len(input.Videos) > 500 {
-		badRequest(w)
-		return
-	}
-	seen := map[string]bool{}
-	members := make([]Membership, 0, len(input.Videos))
-	for index, item := range input.Videos {
-		if item.VideoID == "" || seen[item.VideoID] {
-			badRequest(w)
-			return
-		}
-		seen[item.VideoID] = true
-		video, err := h.videos.Get(r.Context(), item.VideoID)
-		if err != nil || video.Status != "ready" || !h.videos.CanManage(video, session.User.ID, session.User.Role, session.User.OrganizationID, session.User.IsPlatformOwner) {
-			notFound(w)
-			return
-		}
-		if item.ChapterName != nil {
-			value := strings.TrimSpace(*item.ChapterName)
-			if len(value) == 0 || len(value) > 200 {
-				badRequest(w)
-				return
-			}
-			item.ChapterName = &value
-		}
-		members = append(members, Membership{VideoID: item.VideoID, Sequence: index + 1, ChapterTitle: item.ChapterName})
 	}
 	course, err := h.store.Create(r.Context(), session.User.ID, input.Title, input.InstructorName, members)
 	if err != nil {
@@ -184,6 +165,83 @@ func (h *Handler) create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusCreated, map[string]any{"course": course})
+}
+
+func (h *Handler) validatedInput(w http.ResponseWriter, r *http.Request, session auth.Session) (createInput, []Membership, bool) {
+	var input createInput
+	if decode(r, &input) != nil {
+		badRequest(w)
+		return createInput{}, nil, false
+	}
+	input.Title = strings.TrimSpace(input.Title)
+	input.InstructorName = strings.TrimSpace(input.InstructorName)
+	if len(input.Title) == 0 || len(input.Title) > 200 || len(input.InstructorName) == 0 || len(input.InstructorName) > 200 || len(input.Videos) == 0 || len(input.Videos) > 500 {
+		badRequest(w)
+		return createInput{}, nil, false
+	}
+	seen := map[string]bool{}
+	members := make([]Membership, 0, len(input.Videos))
+	for index, item := range input.Videos {
+		if item.VideoID == "" || seen[item.VideoID] {
+			badRequest(w)
+			return createInput{}, nil, false
+		}
+		seen[item.VideoID] = true
+		video, err := h.videos.Get(r.Context(), item.VideoID)
+		if err != nil || video.Status != "ready" || !h.videos.CanManage(video, session.User.ID, session.User.Role, session.User.OrganizationID, session.User.IsPlatformOwner) {
+			notFound(w)
+			return createInput{}, nil, false
+		}
+		if item.ChapterName != nil {
+			value := strings.TrimSpace(*item.ChapterName)
+			if len(value) == 0 || len(value) > 200 {
+				badRequest(w)
+				return createInput{}, nil, false
+			}
+			item.ChapterName = &value
+		}
+		members = append(members, Membership{VideoID: item.VideoID, Sequence: index + 1, ChapterTitle: item.ChapterName})
+	}
+	return input, members, true
+}
+
+func (h *Handler) update(w http.ResponseWriter, r *http.Request) {
+	session, ok := h.session(w, r, true)
+	if !ok {
+		return
+	}
+	course, err := h.store.Get(r.Context(), r.PathValue("id"))
+	if err != nil || !canManageCourse(session, course) {
+		notFound(w)
+		return
+	}
+	input, members, ok := h.validatedInput(w, r, session)
+	if !ok {
+		return
+	}
+	course, err = h.store.Update(r.Context(), course.ID, input.Title, input.InstructorName, members)
+	if err != nil {
+		serverError(w)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"course": course})
+}
+
+func (h *Handler) delete(w http.ResponseWriter, r *http.Request) {
+	session, ok := h.session(w, r, true)
+	if !ok {
+		return
+	}
+	course, err := h.store.Get(r.Context(), r.PathValue("id"))
+	if err != nil || !canManageCourse(session, course) {
+		notFound(w)
+		return
+	}
+	if err = h.store.Delete(r.Context(), course.ID); err != nil {
+		serverError(w)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
 }
 
 func decode(r *http.Request, target any) error {
