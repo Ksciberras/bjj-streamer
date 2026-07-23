@@ -48,6 +48,8 @@ describe('App', () => {
     render(<App />)
     expect(await screen.findByRole('heading', { name: 'Home' })).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Upload' })).not.toBeInTheDocument()
+    fireEvent.click(screen.getAllByRole('button', { name: 'Library' })[0])
+    expect(screen.getByRole('combobox', { name: 'Sort' })).toHaveValue('recent')
   })
 
   it('opens the native player and seeks to a private note', async () => {

@@ -5,6 +5,7 @@ import type { ProgressMap, Video } from '../../types'
 
 type OpenVideo = (video: Video) => void
 type Browse = (filter: { instructor?: string; tag?: string }) => void
+type LibrarySort = 'recent' | 'title' | 'instructor'
 
 export function HomeScreen({ videos, progress, loading, openVideo, browse }: { videos: Video[]; progress: ProgressMap; loading: boolean; openVideo: OpenVideo; browse: Browse }) {
   const ready = videos.filter((video) => video.status === 'ready')
@@ -46,18 +47,38 @@ export function HomeScreen({ videos, progress, loading, openVideo, browse }: { v
 export function LibraryScreen({ videos, progress, loading, initialFilter, openVideo, onSearch }: { videos: Video[]; progress: ProgressMap; loading: boolean; initialFilter: { instructor?: string; tag?: string }; openVideo: OpenVideo; onSearch: (query: string) => Promise<void> }) {
   const [query, setQuery] = useState('')
   const [instructor, setInstructor] = useState(initialFilter.instructor ?? '')
+  const [instructional, setInstructional] = useState('')
   const [tag, setTag] = useState(initialFilter.tag ?? '')
   const [visibility, setVisibility] = useState('')
   const [studyState, setStudyState] = useState('')
+  const [sort, setSort] = useState<LibrarySort>('recent')
   const instructors = [...new Set(videos.map((video) => video.instructor_name))].sort()
+  const instructionals = [
+    ...new Set(videos.flatMap((video) => video.instructional_name ? [video.instructional_name] : [])),
+  ].sort()
   const tags = [...new Set(videos.flatMap((video) => video.tags))].sort()
-  const filtered = videos.filter((video) =>
-    video.status === 'ready'
-    && (!instructor || video.instructor_name === instructor)
-    && (!tag || video.tags.includes(tag))
-    && (!visibility || video.visibility === visibility)
-    && (!studyState || (studyState === 'started' ? (progress[video.id] ?? 0) > 0 : (progress[video.id] ?? 0) === 0)),
-  )
+  const filtered = videos
+    .filter((video) =>
+      video.status === 'ready'
+      && (!instructor || video.instructor_name === instructor)
+      && (!instructional || video.instructional_name === instructional)
+      && (!tag || video.tags.includes(tag))
+      && (!visibility || video.visibility === visibility)
+      && (!studyState || (studyState === 'started' ? (progress[video.id] ?? 0) > 0 : (progress[video.id] ?? 0) === 0)),
+    )
+    .map((video, index) => ({ video, index }))
+    .sort((left, right) => {
+      if (sort === 'title') return left.video.title.localeCompare(right.video.title)
+      if (sort === 'instructor') {
+        return left.video.instructor_name.localeCompare(right.video.instructor_name)
+          || left.video.title.localeCompare(right.video.title)
+      }
+      const dateDifference = Date.parse(right.video.created_at ?? '') - Date.parse(left.video.created_at ?? '')
+      return Number.isFinite(dateDifference) && dateDifference !== 0
+        ? dateDifference
+        : left.index - right.index
+    })
+    .map(({ video }) => video)
 
   async function search(event: FormEvent) {
     event.preventDefault()
@@ -67,13 +88,14 @@ export function LibraryScreen({ videos, progress, loading, initialFilter, openVi
   function clearFilters() {
     setQuery('')
     setInstructor('')
+    setInstructional('')
     setTag('')
     setVisibility('')
     setStudyState('')
     void onSearch('')
   }
 
-  const hasFilters = Boolean(query || instructor || tag || visibility || studyState)
+  const hasFilters = Boolean(query || instructor || instructional || tag || visibility || studyState)
   return <div className="screen">
     <PageHeader title="Library" description={`${filtered.length} accessible ${filtered.length === 1 ? 'video' : 'videos'}`} />
     <form className="library-tools" onSubmit={search} role="search">
@@ -84,7 +106,16 @@ export function LibraryScreen({ videos, progress, loading, initialFilter, openVi
         <button type="submit">Search</button>
       </label>
       <div className="filter-bar">
+        <label className="sort-control">
+          <span>Sort</span>
+          <select value={sort} onChange={(event) => setSort(event.target.value as LibrarySort)}>
+            <option value="recent">Recently added</option>
+            <option value="title">Title A–Z</option>
+            <option value="instructor">Instructor A–Z</option>
+          </select>
+        </label>
         <Filter label="Instructor" value={instructor} onChange={setInstructor} options={instructors} />
+        <Filter label="Instructional" value={instructional} onChange={setInstructional} options={instructionals} />
         <Filter label="Tag" value={tag} onChange={setTag} options={tags} />
         <Filter label="Visibility" value={visibility} onChange={setVisibility} options={['shared', 'private']} />
         <Filter label="Progress" value={studyState} onChange={setStudyState} options={['started', 'not started']} />
