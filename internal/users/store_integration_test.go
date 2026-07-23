@@ -137,3 +137,38 @@ func TestRoleChangeDowngradesAssignmentsRevokesSessionsAndAudits(t *testing.T) {
 		t.Fatalf("audit count=%d err=%v", count, err)
 	}
 }
+
+func TestPlatformOwnerMovesAccountAndRevokesSessions(t *testing.T) {
+	store, pool := testStore(t)
+	var ownerID, targetID, destinationID string
+	if err := pool.QueryRow(context.Background(), `INSERT INTO users(email,password_hash,role,is_platform_owner)VALUES('owner@example.com','hash','admin',TRUE)RETURNING id`).Scan(&ownerID); err != nil {
+		t.Fatal(err)
+	}
+	if err := pool.QueryRow(context.Background(), `INSERT INTO users(email,password_hash,role)VALUES('moving@example.com','hash','student')RETURNING id`).Scan(&targetID); err != nil {
+		t.Fatal(err)
+	}
+	if err := pool.QueryRow(context.Background(), `INSERT INTO organizations(name,slug)VALUES('Move Destination','move-destination') ON CONFLICT(slug)DO UPDATE SET name=EXCLUDED.name RETURNING id`).Scan(&destinationID); err != nil {
+		t.Fatal(err)
+	}
+	token := make([]byte, 32)
+	csrf := make([]byte, 32)
+	if _, err := pool.Exec(context.Background(), `INSERT INTO sessions(user_id,token_hash,csrf_hash,expires_at,idle_expires_at)VALUES($1,$2,$3,$4,$4)`, targetID, token, csrf, time.Now().Add(time.Hour)); err != nil {
+		t.Fatal(err)
+	}
+
+	moved, err := store.MoveToOrganization(context.Background(), ownerID, targetID, destinationID, "move-request")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if moved.OrganizationID == nil || *moved.OrganizationID != destinationID {
+		t.Fatalf("moved=%+v", moved)
+	}
+	var revoked bool
+	if err = pool.QueryRow(context.Background(), `SELECT revoked_at IS NOT NULL FROM sessions WHERE user_id=$1`, targetID).Scan(&revoked); err != nil || !revoked {
+		t.Fatalf("revoked=%v err=%v", revoked, err)
+	}
+	var auditCount int
+	if err = pool.QueryRow(context.Background(), `SELECT count(*) FROM audit_events WHERE actor_user_id=$1 AND target_id=$2 AND action='user.organization_changed'`, ownerID, targetID).Scan(&auditCount); err != nil || auditCount != 1 {
+		t.Fatalf("audit count=%d err=%v", auditCount, err)
+	}
+}

@@ -97,11 +97,33 @@ func (h *Handler) update(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var input struct {
-		Role     *string `json:"role"`
-		Disabled *bool   `json:"disabled"`
+		Role           *string `json:"role"`
+		Disabled       *bool   `json:"disabled"`
+		OrganizationID *string `json:"organization_id"`
 	}
-	if decode(r, &input) != nil || (input.Role == nil && input.Disabled == nil) {
+	if decode(r, &input) != nil || (input.Role == nil && input.Disabled == nil && input.OrganizationID == nil) {
 		badRequest(w, "invalid user update")
+		return
+	}
+	if input.OrganizationID != nil {
+		if !session.User.IsPlatformOwner || input.Role != nil || input.Disabled != nil {
+			notFound(w)
+			return
+		}
+		user, err := h.store.MoveToOrganization(r.Context(), session.User.ID, r.PathValue("id"), *input.OrganizationID, r.Header.Get("X-Request-ID"))
+		if err == ErrNotFound {
+			notFound(w)
+			return
+		}
+		if err == ErrLastAdmin || err == ErrConflict {
+			badRequest(w, err.Error())
+			return
+		}
+		if err != nil {
+			serverError(w)
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"user": user})
 		return
 	}
 	user, err := h.store.Update(r.Context(), session.User.ID, r.PathValue("id"), input.Role, input.Disabled, r.Header.Get("X-Request-ID"))

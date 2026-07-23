@@ -79,6 +79,20 @@ export function AdminScreen({
     }
   }
 
+  async function moveUser(target: User, organizationID: string) {
+    try {
+      await api(`/api/admin/users/${target.id}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ organization_id: organizationID }),
+      })
+      await onRefreshUsers()
+      setNotice(`Moved ${target.email} to its new gym. Their active sessions were signed out.`)
+    } catch (reason) {
+      await onRefreshUsers()
+      setError(errorMessage(reason, 'Unable to move account'))
+    }
+  }
+
   return (
     <div className="screen">
       <PageHeader title="Admin" description="Manage member access and the video catalog." />
@@ -114,6 +128,7 @@ export function AdminScreen({
               <tr>
                 <th>Email</th>
                 <th>Role</th>
+                {platformOwner && <th>Gym</th>}
                 <th>Status</th>
                 <th>Password reset</th>
                 <th>Action</th>
@@ -123,13 +138,18 @@ export function AdminScreen({
               {users.map((item) => (
                 <tr key={item.id}>
                   <td><strong>{item.email}</strong></td>
-                  <td colSpan={4}>
+                  <td colSpan={platformOwner ? 5 : 4}>
                     <form className="table-form" onSubmit={(event) => void updateUser(event, item)}>
                       <select name="role" defaultValue={item.role} aria-label={`Role for ${item.email}`}>
                         <option value="admin">Admin</option>
                         <option value="instructor">Instructor</option>
                         <option value="student">Student</option>
                       </select>
+                      {platformOwner && !item.is_platform_owner && (
+                        <select key={`${item.id}:${item.organization_id}`} defaultValue={item.organization_id} aria-label={`Gym for ${item.email}`} required onChange={(event) => void moveUser(item, event.target.value)}>
+                          {organizations.map((organization) => <option value={organization.id} key={organization.id}>{organization.name}</option>)}
+                        </select>
+                      )}
                       <label className="check">
                         <input name="disabled" type="checkbox" defaultChecked={item.disabled} /> Disabled
                       </label>

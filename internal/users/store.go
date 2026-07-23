@@ -131,6 +131,71 @@ func (s *Store) CanManage(ctx context.Context, actorID, targetID string) bool {
 	return err == nil && allowed
 }
 
+func (s *Store) MoveToOrganization(ctx context.Context, actorID, targetID, organizationID, requestID string) (User, error) {
+	tx, err := s.db.BeginTx(ctx, pgx.TxOptions{IsoLevel: pgx.Serializable})
+	if err != nil {
+		return User{}, err
+	}
+	defer tx.Rollback(ctx)
+
+	var actorIsPlatformOwner bool
+	if err = tx.QueryRow(ctx, `SELECT is_platform_owner FROM users WHERE id=$1`, actorID).Scan(&actorIsPlatformOwner); err != nil || !actorIsPlatformOwner {
+		return User{}, ErrNotFound
+	}
+
+	var current User
+	err = tx.QueryRow(ctx, `SELECT id,email,role,organization_id,is_platform_owner,disabled_at IS NOT NULL,created_at FROM users WHERE id=$1 FOR UPDATE`, targetID).
+		Scan(&current.ID, &current.Email, &current.Role, &current.OrganizationID, &current.IsPlatformOwner, &current.Disabled, &current.CreatedAt)
+	if errors.Is(err, pgx.ErrNoRows) || current.IsPlatformOwner {
+		return User{}, ErrNotFound
+	}
+	if err != nil {
+		return User{}, err
+	}
+
+	var destinationExists bool
+	if err = tx.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM organizations WHERE id=$1)`, organizationID).Scan(&destinationExists); err != nil {
+		return User{}, err
+	}
+	if !destinationExists {
+		return User{}, ErrConflict
+	}
+	if current.OrganizationID != nil && *current.OrganizationID == organizationID {
+		return current, nil
+	}
+
+	if current.Role == "admin" && !current.Disabled && current.OrganizationID != nil {
+		var enabledAdmins int
+		err = tx.QueryRow(ctx, `SELECT count(*) FROM (SELECT id FROM users WHERE organization_id=$1 AND role='admin' AND disabled_at IS NULL FOR UPDATE) enabled_admins`, current.OrganizationID).Scan(&enabledAdmins)
+		if err != nil {
+			return User{}, err
+		}
+		if enabledAdmins <= 1 {
+			return User{}, ErrLastAdmin
+		}
+	}
+
+	var updated User
+	err = tx.QueryRow(ctx, `UPDATE users SET organization_id=$2,updated_at=CURRENT_TIMESTAMP WHERE id=$1 RETURNING id,email,role,organization_id,is_platform_owner,disabled_at IS NOT NULL,created_at`, targetID, organizationID).
+		Scan(&updated.ID, &updated.Email, &updated.Role, &updated.OrganizationID, &updated.IsPlatformOwner, &updated.Disabled, &updated.CreatedAt)
+	if err != nil {
+		return User{}, err
+	}
+	if _, err = tx.Exec(ctx, `UPDATE sessions SET revoked_at=CURRENT_TIMESTAMP WHERE user_id=$1 AND revoked_at IS NULL`, targetID); err != nil {
+		return User{}, err
+	}
+	if err = audit.Record(ctx, tx, actorID, "user.organization_changed", "user", targetID, requestID, map[string]any{
+		"organization_before": current.OrganizationID,
+		"organization_after":  organizationID,
+	}); err != nil {
+		return User{}, err
+	}
+	if err = tx.Commit(ctx); err != nil {
+		return User{}, err
+	}
+	return updated, nil
+}
+
 func (s *Store) Update(ctx context.Context, actorID, targetID string, role *string, disabled *bool, requestID string) (User, error) {
 	tx, err := s.db.BeginTx(ctx, pgx.TxOptions{IsoLevel: pgx.Serializable})
 	if err != nil {

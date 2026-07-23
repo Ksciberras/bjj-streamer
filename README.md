@@ -7,6 +7,10 @@ gym; gym administrators can manage only users and content owned by that gym.
 The designated platform owner can create gyms and make a video or course
 available to one or several gyms. Catalog, playback, thumbnail, course, note,
 progress, and Watch Later requests re-check gym availability in the API.
+The platform owner can also move a normal account to another gym from the
+member table. A transfer preserves that user's private study data, immediately
+revokes their sessions, and changes content access on their next sign-in.
+Moving a gym's final enabled administrator is blocked.
 
 Production deployment targets one DigitalOcean Droplet behind Caddy with PostgreSQL on a private Docker network and media in a private Spaces bucket. See `deploy/README.md`.
 
