@@ -1,0 +1,135 @@
+import { type FormEvent, useState } from 'react'
+import { EmptyState, Filter, LoadingSkeleton, PageHeader, SectionHeading, Visibility } from '../../components/ui'
+import { formatTime, initials } from '../../lib/format'
+import type { ProgressMap, Video } from '../../types'
+
+type OpenVideo = (video: Video) => void
+type Browse = (filter: { instructor?: string; tag?: string }) => void
+
+export function HomeScreen({ videos, progress, loading, openVideo, browse }: { videos: Video[]; progress: ProgressMap; loading: boolean; openVideo: OpenVideo; browse: Browse }) {
+  const ready = videos.filter((video) => video.status === 'ready')
+  const continueVideo = ready
+    .filter((video) => (progress[video.id] ?? 0) > 0)
+    .sort((a, b) => (progress[b.id] ?? 0) - (progress[a.id] ?? 0))[0]
+  const instructors = [...new Set(ready.map((video) => video.instructor_name))].slice(0, 8)
+  const tags = [...new Set(ready.flatMap((video) => video.tags))].slice(0, 12)
+
+  return <div className="screen home-screen">
+    <PageHeader title="Home" description="Pick up where you left off." />
+    <section className="section" aria-labelledby="continue-title">
+      <SectionHeading id="continue-title" title="Continue watching" />
+      {loading
+        ? <LoadingSkeleton />
+        : continueVideo
+          ? <ContinueCard video={continueVideo} savedAt={progress[continueVideo.id]} onResume={() => openVideo(continueVideo)} />
+          : <EmptyState title="No saved progress yet" body="Start a video from your library and it will appear here." action={<button onClick={() => browse({})}>Browse library</button>} />}
+    </section>
+    <section className="section" aria-labelledby="recent-title">
+      <SectionHeading id="recent-title" title="Recently added" action={<button className="text-button" onClick={() => browse({})}>View library →</button>} />
+      {loading
+        ? <LoadingSkeleton />
+        : ready.length
+          ? <div className="video-grid">{ready.slice(0, 4).map((video) => <VideoCard key={video.id} video={video} savedAt={progress[video.id]} onOpen={() => openVideo(video)} />)}</div>
+          : <EmptyState title="The library is empty" body="Ready videos will appear here." />}
+    </section>
+    {instructors.length > 0 && <section className="section" aria-labelledby="instructors-title">
+      <SectionHeading id="instructors-title" title="Browse by instructor" />
+      <div className="browse-list">{instructors.map((instructor) => <button key={instructor} onClick={() => browse({ instructor })}><span className="browse-monogram">{initials(instructor)}</span><span>{instructor}</span><span aria-hidden="true">→</span></button>)}</div>
+    </section>}
+    {tags.length > 0 && <section className="section" aria-labelledby="tags-title">
+      <SectionHeading id="tags-title" title="Browse by tag" />
+      <div className="tag-list">{tags.map((tag) => <button key={tag} onClick={() => browse({ tag })}>{tag}</button>)}</div>
+    </section>}
+  </div>
+}
+
+export function LibraryScreen({ videos, progress, loading, initialFilter, openVideo, onSearch }: { videos: Video[]; progress: ProgressMap; loading: boolean; initialFilter: { instructor?: string; tag?: string }; openVideo: OpenVideo; onSearch: (query: string) => Promise<void> }) {
+  const [query, setQuery] = useState('')
+  const [instructor, setInstructor] = useState(initialFilter.instructor ?? '')
+  const [tag, setTag] = useState(initialFilter.tag ?? '')
+  const [visibility, setVisibility] = useState('')
+  const [studyState, setStudyState] = useState('')
+  const instructors = [...new Set(videos.map((video) => video.instructor_name))].sort()
+  const tags = [...new Set(videos.flatMap((video) => video.tags))].sort()
+  const filtered = videos.filter((video) =>
+    video.status === 'ready'
+    && (!instructor || video.instructor_name === instructor)
+    && (!tag || video.tags.includes(tag))
+    && (!visibility || video.visibility === visibility)
+    && (!studyState || (studyState === 'started' ? (progress[video.id] ?? 0) > 0 : (progress[video.id] ?? 0) === 0)),
+  )
+
+  async function search(event: FormEvent) {
+    event.preventDefault()
+    await onSearch(query)
+  }
+
+  function clearFilters() {
+    setQuery('')
+    setInstructor('')
+    setTag('')
+    setVisibility('')
+    setStudyState('')
+    void onSearch('')
+  }
+
+  const hasFilters = Boolean(query || instructor || tag || visibility || studyState)
+  return <div className="screen">
+    <PageHeader title="Library" description={`${filtered.length} accessible ${filtered.length === 1 ? 'video' : 'videos'}`} />
+    <form className="library-tools" onSubmit={search} role="search">
+      <label className="search-field">
+        <span className="sr-only">Search videos</span>
+        <span aria-hidden="true">⌕</span>
+        <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search title, instructor, series, or tags" />
+        <button type="submit">Search</button>
+      </label>
+      <div className="filter-bar">
+        <Filter label="Instructor" value={instructor} onChange={setInstructor} options={instructors} />
+        <Filter label="Tag" value={tag} onChange={setTag} options={tags} />
+        <Filter label="Visibility" value={visibility} onChange={setVisibility} options={['shared', 'private']} />
+        <Filter label="Progress" value={studyState} onChange={setStudyState} options={['started', 'not started']} />
+        {hasFilters && <button type="button" className="text-button" onClick={clearFilters}>Clear filters</button>}
+      </div>
+    </form>
+    {loading
+      ? <LoadingSkeleton />
+      : filtered.length
+        ? <div className="video-grid library-grid">{filtered.map((video) => <VideoCard key={video.id} video={video} savedAt={progress[video.id]} onOpen={() => openVideo(video)} />)}</div>
+        : <EmptyState title="No videos found" body="Try clearing a filter or using a broader search." action={hasFilters ? <button onClick={clearFilters}>Clear filters</button> : undefined} />}
+  </div>
+}
+
+function VideoCard({ video, savedAt = 0, onOpen }: { video: Video; savedAt?: number; onOpen: () => void }) {
+  return <article className="video-card">
+    <button className="video-cover" onClick={onOpen} aria-label={`Study ${video.title}`}>
+      <VideoPlaceholder video={video} label="Study video" />
+      {savedAt > 0 && <span className="resume-chip">{formatTime(savedAt)} saved</span>}
+    </button>
+    <div className="video-card-body">
+      <div className="video-title-row"><h2>{video.title}</h2><Visibility value={video.visibility} /></div>
+      <p>{video.instructor_name}</p>
+      {(video.instructional_name || video.chapter_name) && <small>{[video.instructional_name, video.chapter_name].filter(Boolean).join(' · ')}</small>}
+      <button className="card-action" onClick={onOpen}>{savedAt > 0 ? 'Resume' : 'Study video'} <span aria-hidden="true">→</span></button>
+    </div>
+  </article>
+}
+
+function ContinueCard({ video, savedAt, onResume }: { video: Video; savedAt: number; onResume: () => void }) {
+  return <article className="continue-card">
+    <button className="continue-cover" onClick={onResume} aria-label={`Resume ${video.title}`}><VideoPlaceholder video={video} label="Continue watching" /></button>
+    <div className="continue-copy">
+      <Visibility value={video.visibility} />
+      <h2>{video.title}</h2>
+      <p>{video.instructor_name}{video.instructional_name ? ` · ${video.instructional_name}` : ''}{video.chapter_name ? ` · ${video.chapter_name}` : ''}</p>
+      <div className="saved-position"><span>Saved position</span><strong>{formatTime(savedAt)}</strong></div>
+      <button onClick={onResume}>Resume at {formatTime(savedAt)} <span aria-hidden="true">→</span></button>
+    </div>
+  </article>
+}
+
+function VideoPlaceholder({ video, label }: { video: Video; label: string }) {
+  return <span className="video-placeholder" aria-hidden="true">
+    <strong>{initials(video.instructor_name)}</strong>
+    <small>{label}</small>
+  </span>
+}

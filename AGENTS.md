@@ -213,6 +213,23 @@ The MVP is simple, not careless.
 - Implement one milestone at a time and stop at its gate.
 - Do not add future features or abstractions speculatively.
 - Prefer a complete working path over broad scaffolding.
+- Keep code organized by cohesive responsibility. Do not accumulate unrelated
+  screens, domain logic, transport code, and utilities in one large file.
+- Split a module when it has multiple independent reasons to change. Prefer
+  feature modules with explicit, narrow interfaces over miscellaneous
+  `helpers`, `utils`, or generic framework layers.
+- Keep React screen components, reusable UI components, API transport, shared
+  types, and formatting functions in separate modules when they are reused or
+  independently testable. Keep state close to the feature that owns it.
+- Keep Go code inside the existing domain packages. Extract focused helpers or
+  services only when doing so clarifies a real responsibility; do not introduce
+  generic repositories, dependency-injection frameworks, or one-method
+  interfaces merely to reduce file length.
+- Favor readable control flow, descriptive names, and small testable functions.
+  Avoid compressed one-line components and dense multi-operation statements.
+- Refactor incrementally and preserve behavior. A cleanup is not permission to
+  change API contracts, authorization, database compatibility, or product
+  scope.
 - Add tests around authorization and data isolation.
 - Use migrations for schema changes.
 - Do not edit an already-applied migration; create a new one.
