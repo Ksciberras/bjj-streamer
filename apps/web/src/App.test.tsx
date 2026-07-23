@@ -44,6 +44,7 @@ describe('App', () => {
     expect(screen.queryByRole('button', { name: 'Admin' })).not.toBeInTheDocument()
     fireEvent.click(screen.getAllByRole('button', { name: 'Upload' })[0])
     expect(screen.queryByRole('button', { name: 'Course batch' })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Build from library' })).toBeInTheDocument()
   })
 
   it('keeps upload controls away from students', async () => {

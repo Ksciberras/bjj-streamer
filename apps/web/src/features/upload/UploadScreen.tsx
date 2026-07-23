@@ -92,18 +92,20 @@ export function UploadScreen({
         title="Upload MP4"
         description={mode === 'batch'
           ? 'Add a complete instructional course with shared metadata.'
-          : 'Add one browser-compatible MP4 to the library.'}
+          : mode === 'course'
+            ? 'Arrange your uploaded videos into an ordered course.'
+            : 'Add one browser-compatible MP4 to the library.'}
       />
       <div className="upload-layout">
         <section className="surface upload-panel">
-          {user.role === 'admin' && (
-            <div className="upload-mode" role="group" aria-label="Upload mode">
-              <button type="button" className={mode === 'single' ? 'active' : ''} onClick={() => setMode('single')}>Single video</button>
+          <div className="upload-mode" role="group" aria-label="Upload mode">
+            <button type="button" className={mode === 'single' ? 'active' : ''} onClick={() => setMode('single')}>Single video</button>
+            {user.role === 'admin' && (
               <button type="button" className={mode === 'batch' ? 'active' : ''} onClick={() => setMode('batch')}>Course batch</button>
-              <button type="button" className={mode === 'course' ? 'active' : ''} onClick={() => setMode('course')}>Build from library</button>
-            </div>
-          )}
-          {mode === 'course' && user.role === 'admin'
+            )}
+            <button type="button" className={mode === 'course' ? 'active' : ''} onClick={() => setMode('course')}>Build from library</button>
+          </div>
+          {mode === 'course'
             ? <CourseBuilder videos={manageable} onComplete={onUploaded} onError={onError} />
             : mode === 'batch' && user.role === 'admin'
             ? <BatchUploadForm onComplete={onUploaded} onError={onError} />
