@@ -154,8 +154,8 @@ func TestUploadAuthorizationCompletionVisibilityAndSearch(t *testing.T) {
 	if response := serveVideo(mux, videoRequest(t, http.MethodGet, "/api/videos/"+payload.Video.ID+"/thumbnail", nil, student)); response.Code != http.StatusNotFound {
 		t.Fatalf("private thumbnail leaked=%d", response.Code)
 	}
-	if response := serveVideo(mux, videoRequest(t, http.MethodGet, "/api/videos/"+payload.Video.ID+"/thumbnail", nil, admin)); response.Code != http.StatusFound {
-		t.Fatalf("admin thumbnail=%d", response.Code)
+	if response := serveVideo(mux, videoRequest(t, http.MethodGet, "/api/videos/"+payload.Video.ID+"/thumbnail", nil, admin)); response.Code != http.StatusNotFound {
+		t.Fatalf("pending thumbnail visible=%d", response.Code)
 	}
 	if response := serveVideo(mux, videoRequest(t, http.MethodGet, "/api/videos?q=armbar", nil, student)); response.Code != http.StatusOK || bytes.Contains(response.Body.Bytes(), []byte("Armbar Study")) {
 		t.Fatalf("private leaked: %d %s", response.Code, response.Body.String())

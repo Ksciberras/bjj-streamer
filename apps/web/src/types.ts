@@ -6,6 +6,7 @@ export type User = {
   email: string
   role: Role
   disabled?: boolean
+  created_at?: string
 }
 
 export type Video = {
@@ -23,6 +24,7 @@ export type Video = {
   thumbnail_url?: string
   byte_size: number
   status: 'pending_upload' | 'ready' | 'archived'
+  created_at?: string
 }
 
 export type Note = {

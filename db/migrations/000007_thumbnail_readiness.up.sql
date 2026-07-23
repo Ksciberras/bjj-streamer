@@ -1,0 +1,2 @@
+ALTER TABLE videos
+    ADD COLUMN thumbnail_ready BOOLEAN NOT NULL DEFAULT FALSE;

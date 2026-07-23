@@ -25,6 +25,7 @@ type Video struct {
 	ContentBasis       string    `json:"content_basis"`
 	ObjectKey          string    `json:"-"`
 	ThumbnailObjectKey *string   `json:"-"`
+	ThumbnailReady     bool      `json:"-"`
 	ThumbnailURL       string    `json:"thumbnail_url,omitempty"`
 	OriginalFilename   string    `json:"original_filename"`
 	MIMEType           string    `json:"mime_type"`
@@ -46,11 +47,11 @@ type Store struct{ db *pgxpool.Pool }
 
 func NewStore(db *pgxpool.Pool) *Store { return &Store{db: db} }
 
-const columns = `id,uploaded_by_user_id,title,instructor_name,instructional_name,chapter_name,description,tags,visibility,content_basis,object_key,thumbnail_object_key,original_filename,mime_type,byte_size,status,created_at,updated_at`
+const columns = `id,uploaded_by_user_id,title,instructor_name,instructional_name,chapter_name,description,tags,visibility,content_basis,object_key,thumbnail_object_key,thumbnail_ready,original_filename,mime_type,byte_size,status,created_at,updated_at`
 
 func scan(row pgx.Row) (Video, error) {
 	var video Video
-	err := row.Scan(&video.ID, &video.UploadedByUserID, &video.Title, &video.InstructorName, &video.InstructionalName, &video.ChapterName, &video.Description, &video.Tags, &video.Visibility, &video.ContentBasis, &video.ObjectKey, &video.ThumbnailObjectKey, &video.OriginalFilename, &video.MIMEType, &video.ByteSize, &video.Status, &video.CreatedAt, &video.UpdatedAt)
+	err := row.Scan(&video.ID, &video.UploadedByUserID, &video.Title, &video.InstructorName, &video.InstructionalName, &video.ChapterName, &video.Description, &video.Tags, &video.Visibility, &video.ContentBasis, &video.ObjectKey, &video.ThumbnailObjectKey, &video.ThumbnailReady, &video.OriginalFilename, &video.MIMEType, &video.ByteSize, &video.Status, &video.CreatedAt, &video.UpdatedAt)
 	return video, err
 }
 
@@ -60,7 +61,7 @@ func (s *Store) SetThumbnail(ctx context.Context, actorID, id, key, requestID st
 		return Video{}, err
 	}
 	defer tx.Rollback(ctx)
-	video, err := scan(tx.QueryRow(ctx, `UPDATE videos SET thumbnail_object_key=$2,updated_at=CURRENT_TIMESTAMP WHERE id=$1 RETURNING `+columns, id, key))
+	video, err := scan(tx.QueryRow(ctx, `UPDATE videos SET thumbnail_object_key=$2,thumbnail_ready=FALSE,updated_at=CURRENT_TIMESTAMP WHERE id=$1 RETURNING `+columns, id, key))
 	if errors.Is(err, pgx.ErrNoRows) {
 		return Video{}, ErrNotFound
 	}
@@ -68,6 +69,28 @@ func (s *Store) SetThumbnail(ctx context.Context, actorID, id, key, requestID st
 		return Video{}, err
 	}
 	if err = audit.Record(ctx, tx, actorID, "video.thumbnail_requested", "video", id, requestID, map[string]any{}); err != nil {
+		return Video{}, err
+	}
+	if err = tx.Commit(ctx); err != nil {
+		return Video{}, err
+	}
+	return video, nil
+}
+
+func (s *Store) MarkThumbnailReady(ctx context.Context, actorID, id, requestID string) (Video, error) {
+	tx, err := s.db.Begin(ctx)
+	if err != nil {
+		return Video{}, err
+	}
+	defer tx.Rollback(ctx)
+	video, err := scan(tx.QueryRow(ctx, `UPDATE videos SET thumbnail_ready=TRUE,updated_at=CURRENT_TIMESTAMP WHERE id=$1 AND thumbnail_object_key IS NOT NULL RETURNING `+columns, id))
+	if errors.Is(err, pgx.ErrNoRows) {
+		return Video{}, ErrNotFound
+	}
+	if err != nil {
+		return Video{}, err
+	}
+	if err = audit.Record(ctx, tx, actorID, "video.thumbnail_completed", "video", id, requestID, map[string]any{}); err != nil {
 		return Video{}, err
 	}
 	if err = tx.Commit(ctx); err != nil {

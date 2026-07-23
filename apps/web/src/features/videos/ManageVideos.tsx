@@ -77,8 +77,15 @@ export function ManageVideos({ videos, onUpdate, onError }: ManageVideosProps) {
             {videos.map((video) => (
               <tr key={video.id}>
                 <td>
-                  <strong>{video.title}</strong>
-                  <small>{video.instructor_name}</small>
+                  <div className="table-video">
+                    {video.thumbnail_url
+                      ? <img src={video.thumbnail_url} alt="" loading="lazy" />
+                      : <span aria-hidden="true" />}
+                    <div>
+                      <strong>{video.title}</strong>
+                      <small>{video.instructor_name}</small>
+                    </div>
+                  </div>
                 </td>
                 <td>{video.visibility}</td>
                 <td>{labelize(video.content_basis)}</td>

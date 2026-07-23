@@ -60,7 +60,7 @@ export function LoadingSkeleton() {
 }
 
 export function StatusMessage({ tone, onDismiss, children }: { tone: 'error' | 'success'; onDismiss?: () => void; children: ReactNode }) {
-  return <div className={`status-message ${tone}`} role={tone === 'error' ? 'alert' : 'status'}>
+  return <div className={`status-message ${tone}`} role={tone === 'error' ? 'alert' : 'status'} aria-live={tone === 'error' ? 'assertive' : 'polite'}>
     <span>{children}</span>
     {onDismiss && <button onClick={onDismiss} aria-label="Dismiss message">×</button>}
   </div>

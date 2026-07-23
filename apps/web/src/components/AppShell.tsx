@@ -27,6 +27,7 @@ export function AppShell({ user, active, canUpload, onNavigate, onLogout, childr
   const primaryNavigation = navigation.filter((item) => item.show)
 
   return <div className="app-shell">
+    <a className="skip-link" href="#main-content">Skip to content</a>
     <aside className="sidebar">
       <Wordmark detail />
       <Navigation items={primaryNavigation} active={active} onNavigate={onNavigate} />
@@ -38,7 +39,7 @@ export function AppShell({ user, active, canUpload, onNavigate, onLogout, childr
       <MobileAccount user={user} canUpload={canUpload} onNavigate={onNavigate} onLogout={onLogout} />
     </header>
 
-    <main className="content" id="main-content">{children}</main>
+    <main className="content" id="main-content" tabIndex={-1}>{children}</main>
 
     <nav className="mobile-nav" aria-label="Mobile navigation">
       {primaryNavigation.filter((item) => item.id === 'home' || item.id === 'library').map((item) =>

@@ -80,7 +80,7 @@ func (h *Handler) list(w http.ResponseWriter, r *http.Request) {
 }
 
 func setThumbnailURL(video *Video) {
-	if video.ThumbnailObjectKey != nil {
+	if video.ThumbnailObjectKey != nil && video.ThumbnailReady {
 		video.ThumbnailURL = "/api/videos/" + video.ID + "/thumbnail"
 	}
 }
@@ -237,7 +237,7 @@ func (h *Handler) createThumbnailUpload(w http.ResponseWriter, r *http.Request) 
 }
 
 func (h *Handler) completeThumbnail(w http.ResponseWriter, r *http.Request) {
-	_, video, ok := h.managedVideo(w, r)
+	session, video, ok := h.managedVideo(w, r)
 	if !ok {
 		return
 	}
@@ -254,6 +254,11 @@ func (h *Handler) completeThumbnail(w http.ResponseWriter, r *http.Request) {
 		badRequest(w)
 		return
 	}
+	video, err = h.store.MarkThumbnailReady(r.Context(), session.User.ID, video.ID, r.Header.Get("X-Request-ID"))
+	if err != nil {
+		serverError(w)
+		return
+	}
 	setThumbnailURL(&video)
 	writeJSON(w, http.StatusOK, map[string]any{"video": video})
 }
@@ -264,7 +269,7 @@ func (h *Handler) thumbnail(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	video, err := h.store.Get(r.Context(), r.PathValue("id"))
-	if err != nil || video.ThumbnailObjectKey == nil || !h.policy.ViewVideo(actor(session), policyVideo(video)) {
+	if err != nil || video.ThumbnailObjectKey == nil || !video.ThumbnailReady || !h.policy.ViewVideo(actor(session), policyVideo(video)) {
 		notFound(w)
 		return
 	}

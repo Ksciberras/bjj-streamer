@@ -142,6 +142,15 @@ export function UploadScreen({
                   />
                   <small>JPEG, PNG, or WebP up to 5 MiB.</small>
                 </label>
+                {thumbnail && (
+                  <div className="thumbnail-summary">
+                    <span aria-hidden="true">IMG</span>
+                    <div>
+                      <strong>{thumbnail.name}</strong>
+                      <span>{formatBytes(thumbnail.size)} · Custom thumbnail</span>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
             <div className="form-step">
