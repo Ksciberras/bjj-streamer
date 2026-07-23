@@ -11,6 +11,8 @@ describe('App', () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false, json: async () => ({ error: 'authentication required' }) }))
     render(<App />)
     expect(await screen.findByRole('heading', { name: 'Sign in' })).toBeInTheDocument()
+    expect(screen.getByLabelText('RollStudy')).toBeInTheDocument()
+    expect(screen.getByText('Private access for invited members.')).toBeInTheDocument()
     expect(screen.queryByText(/create account/i)).not.toBeInTheDocument()
   })
 
@@ -22,8 +24,20 @@ describe('App', () => {
 	}))
 	render(<App />)
 	expect(await screen.findByText('admin@example.com')).toBeInTheDocument()
+	expect(screen.getAllByRole('button', { name: 'Upload' })).toHaveLength(2)
 	fireEvent.click(screen.getAllByRole('button', { name: 'Admin' })[0])
 	expect(screen.getByRole('heading', { name: 'Create account' })).toBeInTheDocument()
+  })
+
+  it('shows upload but not administration to an instructor', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockImplementation(async (input: string) => {
+      if (input === '/api/auth/session') return { ok: true, status: 200, json: async () => ({ user: { id: 'i', email: 'instructor@example.com', role: 'instructor' } }) }
+      return { ok: true, status: 200, json: async () => ({ videos: [] }) }
+    }))
+    render(<App />)
+    expect(await screen.findByRole('heading', { name: 'Home' })).toBeInTheDocument()
+    expect(screen.getAllByRole('button', { name: 'Upload' })).toHaveLength(2)
+    expect(screen.queryByRole('button', { name: 'Admin' })).not.toBeInTheDocument()
   })
 
   it('keeps upload controls away from students', async () => {
@@ -32,7 +46,7 @@ describe('App', () => {
       return { ok: true, status: 200, json: async () => ({ videos: [] }) }
     }))
     render(<App />)
-    expect(await screen.findByRole('heading', { name: 'Ready when you are.' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: 'Home' })).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Upload' })).not.toBeInTheDocument()
   })
 
@@ -47,9 +61,13 @@ describe('App', () => {
     }))
     render(<App />)
     fireEvent.click(await screen.findByRole('button', { name: 'Study Armbar' }))
-    expect(await screen.findByRole('heading', { name: 'Timestamped notes' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: 'Notes' })).toBeInTheDocument()
     const video = document.querySelector('video') as HTMLVideoElement
     fireEvent.click(screen.getByRole('button', { name: '0:42' }))
     expect(video.currentTime).toBe(42)
+    fireEvent.click(screen.getByRole('button', { name: 'Edit' }))
+    expect(screen.getAllByRole('textbox')).toHaveLength(2)
+    fireEvent.keyDown(window, { key: 'Escape' })
+    expect(screen.getAllByRole('textbox')).toHaveLength(1)
   })
 })

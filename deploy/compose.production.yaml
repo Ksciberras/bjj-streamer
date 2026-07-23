@@ -47,6 +47,8 @@ services:
     build:
       context: ..
       dockerfile: deploy/Dockerfile.web
+      args:
+        VITE_PUBLIC_APP_URL: ${PUBLIC_APP_URL:-https://rollstudy.online}
     depends_on:
       api:
         condition: service_started

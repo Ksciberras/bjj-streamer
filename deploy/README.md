@@ -2,6 +2,8 @@
 
 This runbook deploys the proven MVP to one DigitalOcean Droplet with PostgreSQL in Docker Compose, Caddy HTTPS, and media in one private DigitalOcean Spaces bucket.
 
+The canonical production deployment is [RollStudy](https://rollstudy.online). Set both `DOMAIN=rollstudy.online` and `PUBLIC_APP_URL=https://rollstudy.online` in `deploy/.env.production`. Caddy uses `DOMAIN` for HTTPS, while the web build uses `PUBLIC_APP_URL` for canonical metadata.
+
 ## Before deploying
 
 Manually create and verify:
@@ -13,7 +15,7 @@ Manually create and verify:
 - Least-privilege Spaces credentials for that bucket.
 - Billing and resource alerts.
 
-Configure Spaces CORS to allow the production origin to use `PUT`, `GET`, and `HEAD`, allow the `Content-Type` and `Range` headers, and expose `ETag`, `Accept-Ranges`, `Content-Length`, and `Content-Range`. Do not enable public listing or anonymous object access.
+Configure Spaces CORS to allow `https://rollstudy.online` to use `PUT`, `GET`, and `HEAD`, allow the `Content-Type` and `Range` headers, and expose `ETag`, `Accept-Ranges`, `Content-Length`, and `Content-Range`. Do not enable public listing or anonymous object access.
 
 ## Configure the server
 
@@ -45,8 +47,8 @@ docker compose --env-file deploy/.env.production -f deploy/compose.production.ya
 Verify externally:
 
 ```bash
-curl --fail https://YOUR_DOMAIN/healthz
-curl --fail https://YOUR_DOMAIN/readyz
+curl --fail https://rollstudy.online/healthz
+curl --fail https://rollstudy.online/readyz
 ```
 
 Inspect browser cookies and network traffic. The session cookie must be Secure and HTTP-only, object uploads and playback must use short-lived signed Spaces URLs, and no Spaces credential may reach the browser.
@@ -65,7 +67,7 @@ Deploy an update:
 git pull --ff-only
 docker compose --env-file deploy/.env.production -f deploy/compose.production.yaml build
 docker compose --env-file deploy/.env.production -f deploy/compose.production.yaml up -d --wait
-curl --fail https://YOUR_DOMAIN/readyz
+curl --fail https://rollstudy.online/readyz
 ```
 
 Migrations run before the API starts. Never edit an applied migration. Review new migrations and take a backup before updating.
@@ -109,7 +111,7 @@ Restoration replaces database contents and briefly stops the API and web contain
 
 ```bash
 deploy/restore.sh --confirm deploy/backups/postgres-YYYYMMDDTHHMMSSZ.dump
-curl --fail https://YOUR_DOMAIN/readyz
+curl --fail https://rollstudy.online/readyz
 ```
 
 After restoration, log in and inspect representative users, videos, progress, and notes. Confirm referenced Spaces objects still exist. A successful script exit alone is not proof of a useful restore.
@@ -119,8 +121,8 @@ After restoration, log in and inspect representative users, videos, progress, an
 For the pilot, use a simple external HTTPS monitor against:
 
 ```text
-https://YOUR_DOMAIN/healthz
-https://YOUR_DOMAIN/readyz
+https://rollstudy.online/healthz
+https://rollstudy.online/readyz
 ```
 
 Alert on non-`200` responses and certificate expiry. On the Droplet, monitor disk usage, memory, container restart counts, PostgreSQL volume growth, backup success and age, and DigitalOcean bandwidth/storage charges.

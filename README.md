@@ -1,6 +1,6 @@
-# BJJ Streaming MVP
+# RollStudy
 
-This repository implements the functional MVP described in `AGENTS.md`: secure accounts, searchable direct MP4 uploads, authorized playback, per-user resume progress, and private timestamped notes.
+RollStudy is a private BJJ video study workspace at [rollstudy.online](https://rollstudy.online). It implements the functional MVP described in `AGENTS.md`: secure accounts, searchable direct MP4 uploads, authorized playback, per-user resume progress, and private timestamped notes.
 
 Production deployment targets one DigitalOcean Droplet behind Caddy with PostgreSQL on a private Docker network and media in a private Spaces bucket. See `deploy/README.md`.
 
