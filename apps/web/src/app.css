@@ -307,9 +307,36 @@ td small { margin-top: .2rem; }
 .analytics-metric { display: grid; gap: .35rem; padding: 1rem; }
 .analytics-metric strong { color: var(--accent-hover); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 1.5rem; font-variant-numeric: tabular-nums; }
 .analytics-metric span { color: var(--muted); font-size: .7rem; }
+.analytics-charts { display: grid; grid-template-columns: minmax(0, 1.7fr) minmax(260px, .8fr); gap: .75rem; margin-top: .75rem; }
+.analytics-chart { min-width: 0; padding: 1rem; }
+.analytics-chart-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; margin-bottom: 1rem; }
+.analytics-chart-heading h2 { margin: 0 0 .2rem; font-size: .82rem; }
+.analytics-chart-heading p { margin: 0; color: var(--muted); font-size: .68rem; }
+.analytics-chart-heading > span, .analytics-caption { color: var(--subtle); font-size: .66rem; }
+.horizontal-chart { display: grid; gap: .72rem; }
+.chart-row { display: grid; gap: .3rem; }
+.chart-row > div { display: flex; min-width: 0; align-items: center; justify-content: space-between; gap: 1rem; }
+.chart-row strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: .7rem; font-weight: 600; }
+.chart-row > div span { color: var(--muted); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .66rem; }
+.chart-track { display: block; height: 6px; overflow: hidden; border-radius: 2px; background: var(--surface-hover); }
+.chart-track i { display: block; height: 100%; min-width: 3px; border-radius: inherit; background: var(--accent); transition: width 180ms ease; }
+.engagement-chart { display: grid; min-height: 180px; grid-template-columns: repeat(3, 1fr); align-items: end; gap: .8rem; padding-top: .5rem; }
+.engagement-chart > div { display: grid; justify-items: center; gap: .3rem; }
+.vertical-chart-track { position: relative; display: block; width: min(42px, 70%); height: 112px; overflow: hidden; border-radius: 3px 3px 1px 1px; background: var(--surface-hover); }
+.vertical-chart-track i { position: absolute; inset: auto 0 0; display: block; border-radius: inherit; background: var(--accent); transition: height 180ms ease; }
+.engagement-chart > div:nth-child(2) .vertical-chart-track i { background: var(--warning); }
+.engagement-chart > div:nth-child(3) .vertical-chart-track i { background: var(--success); }
+.engagement-chart strong { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .76rem; }
+.engagement-chart small { color: var(--muted); font-size: .65rem; }
+.chart-empty { display: grid; min-height: 180px; place-items: center; align-content: center; gap: .75rem; text-align: center; }
+.chart-empty span { display: block; width: 70%; height: 6px; border-radius: 2px; background: var(--surface-hover); }
+.chart-empty p { max-width: 240px; margin: 0; font-size: .7rem; }
 .analytics-table table { min-width: 650px; }
 .analytics-table td:not(:first-child) { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-variant-numeric: tabular-nums; }
-.analytics-loading { min-height: 180px; padding: 3rem 0; text-align: center; }
+.analytics-loading { display: grid; gap: .75rem; min-height: 180px; }
+.analytics-loading .analytics-overview > span, .analytics-loading-chart { border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface); animation: pulse 1.4s infinite ease-in-out; }
+.analytics-loading .analytics-overview > span { min-height: 82px; }
+.analytics-loading-chart { min-height: 230px; }
 .analytics-privacy { margin: 0; color: var(--subtle); font-size: .68rem; }
 
 .empty-state { display: grid; min-height: 180px; place-items: center; align-content: center; padding: 2rem; border: 1px dashed var(--border-strong); border-radius: var(--radius); background: rgba(255,255,255,.012); text-align: center; }
@@ -400,6 +427,7 @@ td small { margin-top: .2rem; }
   .account-create-form, .account-create-form.platform { grid-template-columns: 1fr; }
   .admin-form-actions button { width: 100%; }
   .analytics-overview { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .analytics-charts { grid-template-columns: 1fr; }
   .login-page { padding: 1rem; }
   .login-card { padding: 1.5rem; }
 }
@@ -953,6 +981,9 @@ td small { margin-top: .2rem; }
 }
 
 @media (max-width: 700px) {
+  .analytics-toolbar { align-items: stretch; flex-direction: column; }
+  .analytics-gym-filter { justify-content: space-between; }
+  .period-switcher { align-self: flex-start; }
   .manage-course-row { align-items: flex-start; flex-direction: column; }
   .manage-course-row .manage-row-actions { width: 100%; }
   .manage-course-row .manage-row-actions button { flex: 1; }

@@ -49,6 +49,8 @@ describe('App', () => {
     fireEvent.click(screen.getAllByRole('button', { name: 'Analytics' })[0])
     expect(await screen.findByRole('heading', { name: 'Analytics' })).toBeInTheDocument()
     expect(screen.getByText('Active learners')).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Most studied' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Study flow' })).toBeInTheDocument()
   })
 
   it('keeps upload controls away from students', async () => {

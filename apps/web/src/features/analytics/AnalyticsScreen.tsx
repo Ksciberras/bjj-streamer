@@ -59,7 +59,7 @@ export function AnalyticsScreen({ organizations, platformOwner, setError }: Anal
           <button type="button" className={period === 30 ? 'active' : ''} onClick={() => changePeriod(30)}>30 days</button>
         </div>
       </div>
-      {loading ? <p className="analytics-loading" role="status">Loading analytics…</p> : analytics && (
+      {loading ? <AnalyticsLoading /> : analytics && (
         <>
           <section className="analytics-overview" aria-label={`${period}-day overview`}>
             <Metric label="Active learners" value={analytics.overview.active_learners} />
@@ -67,8 +67,9 @@ export function AnalyticsScreen({ organizations, platformOwner, setError }: Anal
             <Metric label="Resumes" value={analytics.overview.resumes} />
             <Metric label="Notes created" value={analytics.overview.notes_created} />
           </section>
+          <AnalyticsCharts analytics={analytics} period={period} />
           <section className="section">
-            <SectionHeading title="Content engagement" />
+            <SectionHeading title="Video details" action={<span className="analytics-caption">Exact activity totals</span>} />
             {analytics.content.length ? (
               <div className="responsive-table surface analytics-table">
                 <table>
@@ -84,7 +85,7 @@ export function AnalyticsScreen({ organizations, platformOwner, setError }: Anal
             ) : <EmptyState title="No content activity yet" body="Video starts, resumes, completions, and note counts will appear here." />}
           </section>
           <section className="section">
-            <SectionHeading title="Member activity" />
+            <SectionHeading title="Member activity" action={<span className="analytics-caption">{analytics.overview.active_learners} active in this period</span>} />
             {analytics.members.length ? (
               <div className="responsive-table surface analytics-table">
                 <table>
@@ -110,4 +111,65 @@ export function AnalyticsScreen({ organizations, platformOwner, setError }: Anal
 
 function Metric({ label, value }: { label: string; value: number }) {
   return <div className="surface analytics-metric"><strong>{value}</strong><span>{label}</span></div>
+}
+
+function AnalyticsCharts({ analytics, period }: { analytics: Analytics; period: number }) {
+  const activeContent = analytics.content
+    .filter((item) => item.unique_viewers > 0)
+    .slice(0, 6)
+  const maxViewers = Math.max(1, ...activeContent.map((item) => item.unique_viewers))
+  const engagement = [
+    { label: 'Started', value: analytics.content.reduce((total, item) => total + item.starts, 0) },
+    { label: 'Resumed', value: analytics.content.reduce((total, item) => total + item.resumes, 0) },
+    { label: 'Completed', value: analytics.content.reduce((total, item) => total + item.completions, 0) },
+  ]
+  const maxEngagement = Math.max(1, ...engagement.map((item) => item.value))
+
+  return (
+    <section className="analytics-charts" aria-label={`${period}-day engagement charts`}>
+      <div className="surface analytics-chart">
+        <div className="analytics-chart-heading">
+          <div><h2>Most studied</h2><p>Unique learners by video</p></div>
+          <span>{period} days</span>
+        </div>
+        {activeContent.length ? (
+          <div className="horizontal-chart" role="img" aria-label={`Most studied videos over ${period} days`}>
+            {activeContent.map((item) => (
+              <div className="chart-row" key={item.video_id}>
+                <div><strong title={item.title}>{item.title}</strong><span>{item.unique_viewers}</span></div>
+                <span className="chart-track"><i style={{ width: `${(item.unique_viewers / maxViewers) * 100}%` }} /></span>
+              </div>
+            ))}
+          </div>
+        ) : <ChartEmpty body="Videos will appear after members begin studying." />}
+      </div>
+      <div className="surface analytics-chart">
+        <div className="analytics-chart-heading">
+          <div><h2>Study flow</h2><p>How members returned and progressed</p></div>
+        </div>
+        {engagement.some((item) => item.value > 0) ? (
+          <div className="engagement-chart" role="img" aria-label={`Starts, resumes, and completions over ${period} days`}>
+            {engagement.map((item) => (
+              <div key={item.label}>
+                <span className="vertical-chart-track"><i style={{ height: `${Math.max(4, (item.value / maxEngagement) * 100)}%` }} /></span>
+                <strong>{item.value}</strong>
+                <small>{item.label}</small>
+              </div>
+            ))}
+          </div>
+        ) : <ChartEmpty body="Starts, returns, and completions will build this chart." />}
+      </div>
+    </section>
+  )
+}
+
+function ChartEmpty({ body }: { body: string }) {
+  return <div className="chart-empty"><span aria-hidden="true" /><p>{body}</p></div>
+}
+
+function AnalyticsLoading() {
+  return <div className="analytics-loading" role="status" aria-label="Loading analytics">
+    <div className="analytics-overview">{[0, 1, 2, 3].map((item) => <span key={item} />)}</div>
+    <div className="analytics-loading-chart" />
+  </div>
 }
