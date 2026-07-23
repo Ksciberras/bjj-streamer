@@ -55,7 +55,7 @@ func (h *Handler) study(w http.ResponseWriter, r *http.Request) {
 	watchLater := []videos.Video{}
 	for _, id := range ids {
 		video, getErr := h.videos.Get(r.Context(), id)
-		if getErr == nil && h.policy.ViewVideo(authorization.Actor{ID: session.User.ID, Role: authorization.Role(session.User.Role)}, authorization.Video{UploaderID: video.UploadedByUserID, Visibility: authorization.Visibility(video.Visibility), Ready: video.Status == "ready"}) {
+		if getErr == nil && h.videos.CanView(r.Context(), video, session.User.ID, session.User.Role, session.User.OrganizationID, session.User.IsPlatformOwner) {
 			if video.ThumbnailReady && video.ThumbnailObjectKey != nil {
 				video.ThumbnailURL = "/api/videos/" + video.ID + "/thumbnail"
 			}
@@ -74,7 +74,7 @@ func (h *Handler) study(w http.ResponseWriter, r *http.Request) {
 	visibleNotes := []studyNoteResponse{}
 	for _, note := range notes {
 		video, getErr := h.videos.Get(r.Context(), note.VideoID)
-		if getErr == nil && h.policy.ViewVideo(authorization.Actor{ID: session.User.ID, Role: authorization.Role(session.User.Role)}, authorization.Video{UploaderID: video.UploadedByUserID, Visibility: authorization.Visibility(video.Visibility), Ready: video.Status == "ready"}) {
+		if getErr == nil && h.videos.CanView(r.Context(), video, session.User.ID, session.User.Role, session.User.OrganizationID, session.User.IsPlatformOwner) {
 			if video.ThumbnailReady && video.ThumbnailObjectKey != nil {
 				video.ThumbnailURL = "/api/videos/" + video.ID + "/thumbnail"
 			}
@@ -117,7 +117,7 @@ func (h *Handler) authorized(w http.ResponseWriter, r *http.Request, csrf bool) 
 		return auth.Session{}, videos.Video{}, false
 	}
 	video, err := h.videos.Get(r.Context(), r.PathValue("id"))
-	if err != nil || !h.policy.ViewVideo(authorization.Actor{ID: session.User.ID, Role: authorization.Role(session.User.Role)}, authorization.Video{UploaderID: video.UploadedByUserID, Visibility: authorization.Visibility(video.Visibility), Ready: video.Status == "ready"}) {
+	if err != nil || !h.videos.CanView(r.Context(), video, session.User.ID, session.User.Role, session.User.OrganizationID, session.User.IsPlatformOwner) {
 		notFound(w)
 		return auth.Session{}, videos.Video{}, false
 	}

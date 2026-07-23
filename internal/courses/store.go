@@ -14,6 +14,7 @@ var ErrNotFound = errors.New("course not found")
 type Course struct {
 	ID              string    `json:"id"`
 	CreatedByUserID string    `json:"created_by_user_id"`
+	OrganizationID  string    `json:"organization_id"`
 	Title           string    `json:"title"`
 	InstructorName  string    `json:"instructor_name"`
 	CreatedAt       time.Time `json:"created_at"`
@@ -30,8 +31,8 @@ type Store struct{ db *pgxpool.Pool }
 
 func NewStore(db *pgxpool.Pool) *Store { return &Store{db: db} }
 
-func (s *Store) List(ctx context.Context) ([]Course, error) {
-	rows, err := s.db.Query(ctx, `SELECT id,created_by_user_id,title,instructor_name,created_at,updated_at FROM courses ORDER BY updated_at DESC,id`)
+func (s *Store) List(ctx context.Context, organizationID *string, platformOwner bool) ([]Course, error) {
+	rows, err := s.db.Query(ctx, `SELECT id,created_by_user_id,organization_id,title,instructor_name,created_at,updated_at FROM courses c WHERE $2 OR EXISTS(SELECT 1 FROM course_organizations co WHERE co.course_id=c.id AND co.organization_id=$1) ORDER BY updated_at DESC,id`, organizationID, platformOwner)
 	if err != nil {
 		return nil, err
 	}
@@ -39,7 +40,7 @@ func (s *Store) List(ctx context.Context) ([]Course, error) {
 	result := []Course{}
 	for rows.Next() {
 		var course Course
-		if err := rows.Scan(&course.ID, &course.CreatedByUserID, &course.Title, &course.InstructorName, &course.CreatedAt, &course.UpdatedAt); err != nil {
+		if err := rows.Scan(&course.ID, &course.CreatedByUserID, &course.OrganizationID, &course.Title, &course.InstructorName, &course.CreatedAt, &course.UpdatedAt); err != nil {
 			return nil, err
 		}
 		result = append(result, course)
@@ -49,12 +50,23 @@ func (s *Store) List(ctx context.Context) ([]Course, error) {
 
 func (s *Store) Get(ctx context.Context, id string) (Course, error) {
 	var course Course
-	err := s.db.QueryRow(ctx, `SELECT id,created_by_user_id,title,instructor_name,created_at,updated_at FROM courses WHERE id=$1`, id).
-		Scan(&course.ID, &course.CreatedByUserID, &course.Title, &course.InstructorName, &course.CreatedAt, &course.UpdatedAt)
+	err := s.db.QueryRow(ctx, `SELECT id,created_by_user_id,organization_id,title,instructor_name,created_at,updated_at FROM courses WHERE id=$1`, id).
+		Scan(&course.ID, &course.CreatedByUserID, &course.OrganizationID, &course.Title, &course.InstructorName, &course.CreatedAt, &course.UpdatedAt)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return Course{}, ErrNotFound
 	}
 	return course, err
+}
+
+func (s *Store) Available(ctx context.Context, courseID string, organizationID *string, platformOwner bool) bool {
+	if platformOwner {
+		return true
+	}
+	if organizationID == nil {
+		return false
+	}
+	var available bool
+	return s.db.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM course_organizations WHERE course_id=$1 AND organization_id=$2)`, courseID, organizationID).Scan(&available) == nil && available
 }
 
 func (s *Store) Memberships(ctx context.Context, id string) ([]Membership, error) {
@@ -81,9 +93,12 @@ func (s *Store) Create(ctx context.Context, actorID, title, instructor string, m
 	}
 	defer tx.Rollback(ctx)
 	var course Course
-	err = tx.QueryRow(ctx, `INSERT INTO courses(created_by_user_id,title,instructor_name) VALUES($1,$2,$3) RETURNING id,created_by_user_id,title,instructor_name,created_at,updated_at`, actorID, title, instructor).
-		Scan(&course.ID, &course.CreatedByUserID, &course.Title, &course.InstructorName, &course.CreatedAt, &course.UpdatedAt)
+	err = tx.QueryRow(ctx, `INSERT INTO courses(created_by_user_id,organization_id,title,instructor_name) VALUES($1,COALESCE((SELECT organization_id FROM users WHERE id=$1),(SELECT id FROM organizations ORDER BY created_at LIMIT 1)),$2,$3) RETURNING id,created_by_user_id,organization_id,title,instructor_name,created_at,updated_at`, actorID, title, instructor).
+		Scan(&course.ID, &course.CreatedByUserID, &course.OrganizationID, &course.Title, &course.InstructorName, &course.CreatedAt, &course.UpdatedAt)
 	if err != nil {
+		return Course{}, err
+	}
+	if _, err = tx.Exec(ctx, `INSERT INTO course_organizations(course_id,organization_id) VALUES($1,$2)`, course.ID, course.OrganizationID); err != nil {
 		return Course{}, err
 	}
 	for _, member := range members {

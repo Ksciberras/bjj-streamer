@@ -2,6 +2,12 @@
 
 RollStudy is a private BJJ video study workspace at [rollstudy.online](https://rollstudy.online). It implements the functional MVP described in `AGENTS.md`: secure accounts, searchable direct MP4 uploads, authorized playback, per-user resume progress, and private timestamped notes.
 
+RollStudy supports isolated gym tenants. Normal accounts belong to exactly one
+gym; gym administrators can manage only users and content owned by that gym.
+The designated platform owner can create gyms and make a video or course
+available to one or several gyms. Catalog, playback, thumbnail, course, note,
+progress, and Watch Later requests re-check gym availability in the API.
+
 Production deployment targets one DigitalOcean Droplet behind Caddy with PostgreSQL on a private Docker network and media in a private Spaces bucket. See `deploy/README.md`.
 
 ## Prerequisites
@@ -101,7 +107,13 @@ extensions, enforce the 5 MiB limit, and verify stored metadata.
 
 Authentication uses Argon2id passwords, random server-side sessions stored only as token hashes, strict SameSite cookies, CSRF tokens for state-changing authenticated requests, and an in-process login limiter. The limiter resets when the API restarts and is suitable only for the single-Droplet MVP.
 
-The database still contains the older invitation, personal/shared library, membership, and append-only audit structures. They are retained for migration and stored-data compatibility. Invitation endpoints are inactive, and library/audit management is no longer part of the primary frontend journey. Applied migrations remain immutable; ordered courses are introduced by migration `000008` and private Watch Later entries by `000009`.
+The database still contains the older invitation, personal/shared library, membership, and append-only audit structures. They are retained for migration and stored-data compatibility. Invitation and legacy library endpoints are inactive, and library/audit management is no longer part of the primary frontend journey. Applied migrations remain immutable; ordered courses are introduced by migration `000008`, private Watch Later entries by `000009`, and gym isolation by `000010`.
+
+Migration `000010` deliberately stops if `kyranu2@gmail.com` or
+`info@bjjcork.com` is missing. It promotes the first account to platform owner,
+creates the BJJ Cork gym, makes the second account its administrator, and
+backfills all existing users and content into BJJ Cork. Take and verify a
+database backup before applying it in production.
 
 ## Verification
 

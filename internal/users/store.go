@@ -17,17 +17,23 @@ var ErrLastAdmin = errors.New("cannot remove final enabled administrator")
 var ErrConflict = errors.New("conflict")
 
 type User struct {
-	ID        string    `json:"id"`
-	Email     string    `json:"email"`
-	Role      string    `json:"role"`
-	Disabled  bool      `json:"disabled"`
-	CreatedAt time.Time `json:"created_at"`
+	ID              string    `json:"id"`
+	Email           string    `json:"email"`
+	Role            string    `json:"role"`
+	OrganizationID  *string   `json:"organization_id,omitempty"`
+	IsPlatformOwner bool      `json:"is_platform_owner"`
+	Disabled        bool      `json:"disabled"`
+	CreatedAt       time.Time `json:"created_at"`
 }
 type Store struct{ db *pgxpool.Pool }
 
 func NewStore(db *pgxpool.Pool) *Store { return &Store{db: db} }
 
 func (s *Store) Create(ctx context.Context, actorID, email, role, passwordHash, requestID string) (User, error) {
+	return s.CreateInOrganization(ctx, actorID, email, role, passwordHash, nil, requestID)
+}
+
+func (s *Store) CreateInOrganization(ctx context.Context, actorID, email, role, passwordHash string, organizationID *string, requestID string) (User, error) {
 	if role != "admin" && role != "instructor" && role != "student" {
 		return User{}, ErrConflict
 	}
@@ -37,7 +43,7 @@ func (s *Store) Create(ctx context.Context, actorID, email, role, passwordHash, 
 	}
 	defer tx.Rollback(ctx)
 	var user User
-	err = tx.QueryRow(ctx, `INSERT INTO users(email,password_hash,role)VALUES($1,$2,$3)RETURNING id,email,role,disabled_at IS NOT NULL,created_at`, strings.ToLower(strings.TrimSpace(email)), passwordHash, role).Scan(&user.ID, &user.Email, &user.Role, &user.Disabled, &user.CreatedAt)
+	err = tx.QueryRow(ctx, `INSERT INTO users(email,password_hash,role,organization_id)VALUES($1,$2,$3,COALESCE($5,(SELECT organization_id FROM users WHERE id=$4)))RETURNING id,email,role,organization_id,is_platform_owner,disabled_at IS NOT NULL,created_at`, strings.ToLower(strings.TrimSpace(email)), passwordHash, role, actorID, organizationID).Scan(&user.ID, &user.Email, &user.Role, &user.OrganizationID, &user.IsPlatformOwner, &user.Disabled, &user.CreatedAt)
 	var pgErr *pgconn.PgError
 	if errors.As(err, &pgErr) && pgErr.Code == "23505" {
 		return User{}, ErrConflict
@@ -77,7 +83,7 @@ func (s *Store) ResetPassword(ctx context.Context, actorID, targetID, passwordHa
 }
 
 func (s *Store) List(ctx context.Context) ([]User, error) {
-	rows, err := s.db.Query(ctx, `SELECT id,email,role,disabled_at IS NOT NULL,created_at FROM users ORDER BY created_at,id`)
+	rows, err := s.db.Query(ctx, `SELECT id,email,role,organization_id,is_platform_owner,disabled_at IS NOT NULL,created_at FROM users ORDER BY created_at,id`)
 	if err != nil {
 		return nil, err
 	}
@@ -85,7 +91,24 @@ func (s *Store) List(ctx context.Context) ([]User, error) {
 	result := []User{}
 	for rows.Next() {
 		var user User
-		if err = rows.Scan(&user.ID, &user.Email, &user.Role, &user.Disabled, &user.CreatedAt); err != nil {
+		if err = rows.Scan(&user.ID, &user.Email, &user.Role, &user.OrganizationID, &user.IsPlatformOwner, &user.Disabled, &user.CreatedAt); err != nil {
+			return nil, err
+		}
+		result = append(result, user)
+	}
+	return result, rows.Err()
+}
+
+func (s *Store) ListFor(ctx context.Context, actorID string) ([]User, error) {
+	rows, err := s.db.Query(ctx, `SELECT u.id,u.email,u.role,u.organization_id,u.is_platform_owner,u.disabled_at IS NOT NULL,u.created_at FROM users u JOIN users a ON a.id=$1 WHERE a.is_platform_owner OR (NOT u.is_platform_owner AND u.organization_id=a.organization_id) ORDER BY u.created_at,u.id`, actorID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	result := []User{}
+	for rows.Next() {
+		var user User
+		if err = rows.Scan(&user.ID, &user.Email, &user.Role, &user.OrganizationID, &user.IsPlatformOwner, &user.Disabled, &user.CreatedAt); err != nil {
 			return nil, err
 		}
 		result = append(result, user)
@@ -95,11 +118,17 @@ func (s *Store) List(ctx context.Context) ([]User, error) {
 
 func (s *Store) Get(ctx context.Context, id string) (User, error) {
 	var user User
-	err := s.db.QueryRow(ctx, `SELECT id,email,role,disabled_at IS NOT NULL,created_at FROM users WHERE id=$1`, id).Scan(&user.ID, &user.Email, &user.Role, &user.Disabled, &user.CreatedAt)
+	err := s.db.QueryRow(ctx, `SELECT id,email,role,organization_id,is_platform_owner,disabled_at IS NOT NULL,created_at FROM users WHERE id=$1`, id).Scan(&user.ID, &user.Email, &user.Role, &user.OrganizationID, &user.IsPlatformOwner, &user.Disabled, &user.CreatedAt)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return User{}, ErrNotFound
 	}
 	return user, err
+}
+
+func (s *Store) CanManage(ctx context.Context, actorID, targetID string) bool {
+	var allowed bool
+	err := s.db.QueryRow(ctx, `SELECT a.is_platform_owner OR (NOT t.is_platform_owner AND a.organization_id=t.organization_id) FROM users a JOIN users t ON t.id=$2 WHERE a.id=$1`, actorID, targetID).Scan(&allowed)
+	return err == nil && allowed
 }
 
 func (s *Store) Update(ctx context.Context, actorID, targetID string, role *string, disabled *bool, requestID string) (User, error) {
@@ -130,7 +159,7 @@ func (s *Store) Update(ctx context.Context, actorID, targetID string, role *stri
 	removingAdmin := current.Role == "admin" && !current.Disabled && (nextRole != "admin" || nextDisabled)
 	if removingAdmin {
 		var count int
-		err = tx.QueryRow(ctx, `SELECT count(*) FROM (SELECT id FROM users WHERE role='admin' AND disabled_at IS NULL FOR UPDATE) enabled_admins`).Scan(&count)
+		err = tx.QueryRow(ctx, `SELECT count(*) FROM (SELECT id FROM users WHERE role='admin' AND disabled_at IS NULL AND organization_id=(SELECT organization_id FROM users WHERE id=$1) FOR UPDATE) enabled_admins`, targetID).Scan(&count)
 		if err != nil {
 			return User{}, err
 		}

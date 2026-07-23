@@ -1,0 +1,13 @@
+DROP TABLE course_organizations;
+ALTER TABLE courses DROP COLUMN organization_id;
+DROP TRIGGER videos_share_with_owner ON videos;
+DROP FUNCTION share_video_with_owner_organization();
+DROP TABLE video_organizations;
+DROP TRIGGER videos_assign_organization ON videos;
+DROP FUNCTION assign_video_organization();
+ALTER TABLE videos DROP COLUMN organization_id;
+DROP TRIGGER users_assign_default_organization ON users;
+DROP FUNCTION assign_default_organization();
+ALTER TABLE users DROP CONSTRAINT users_organization_required;
+ALTER TABLE users DROP COLUMN is_platform_owner,DROP COLUMN organization_id;
+DROP TABLE organizations;

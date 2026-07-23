@@ -66,14 +66,14 @@ func (h *Handler) visibleCourse(r *http.Request, session auth.Session, course Co
 		if getErr != nil {
 			continue
 		}
-		if h.policy.ViewVideo(actor(session), policyVideo(video)) {
+		if h.videos.CanView(r.Context(), video, session.User.ID, session.User.Role, session.User.OrganizationID, session.User.IsPlatformOwner) {
 			if video.ThumbnailReady && video.ThumbnailObjectKey != nil {
 				video.ThumbnailURL = "/api/videos/" + video.ID + "/thumbnail"
 			}
 			result.Videos = append(result.Videos, courseVideo{Video: video, SequenceNumber: member.Sequence, CourseChapterName: member.ChapterTitle})
 		}
 	}
-	canManage := session.User.Role == "admin" || (session.User.Role == "instructor" && course.CreatedByUserID == session.User.ID)
+	canManage := session.User.IsPlatformOwner || (session.User.OrganizationID != nil && course.OrganizationID == *session.User.OrganizationID && (session.User.Role == "admin" || (session.User.Role == "instructor" && course.CreatedByUserID == session.User.ID)))
 	return result, canManage || len(result.Videos) > 0, nil
 }
 
@@ -82,7 +82,7 @@ func (h *Handler) list(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	values, err := h.store.List(r.Context())
+	values, err := h.store.List(r.Context(), session.User.OrganizationID, session.User.IsPlatformOwner)
 	if err != nil {
 		serverError(w)
 		return
@@ -97,7 +97,7 @@ func (h *Handler) list(w http.ResponseWriter, r *http.Request) {
 		if allowed {
 			result = append(result, map[string]any{
 				"id": course.ID, "created_by_user_id": course.CreatedByUserID, "title": course.Title,
-				"instructor_name": course.InstructorName, "video_count": len(visible.Videos),
+				"instructor_name": course.InstructorName, "organization_id": course.OrganizationID, "video_count": len(visible.Videos),
 			})
 		}
 	}
@@ -110,7 +110,7 @@ func (h *Handler) get(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	course, err := h.store.Get(r.Context(), r.PathValue("id"))
-	if err != nil {
+	if err != nil || !h.store.Available(r.Context(), course.ID, session.User.OrganizationID, session.User.IsPlatformOwner) {
 		notFound(w)
 		return
 	}
@@ -164,7 +164,7 @@ func (h *Handler) create(w http.ResponseWriter, r *http.Request) {
 		}
 		seen[item.VideoID] = true
 		video, err := h.videos.Get(r.Context(), item.VideoID)
-		if err != nil || video.Status != "ready" || !h.policy.ManageVideo(actor(session), policyVideo(video)) {
+		if err != nil || video.Status != "ready" || !h.videos.CanManage(video, session.User.ID, session.User.Role, session.User.OrganizationID, session.User.IsPlatformOwner) {
 			notFound(w)
 			return
 		}

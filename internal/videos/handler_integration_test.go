@@ -13,6 +13,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/kyransciberras/bjj-streaming/internal/auth"
 	"github.com/kyransciberras/bjj-streaming/internal/objectstorage"
+	"github.com/kyransciberras/bjj-streaming/internal/users"
 )
 
 type fakeObjects struct {
@@ -171,6 +172,47 @@ func TestUploadAuthorizationCompletionVisibilityAndSearch(t *testing.T) {
 	}
 	if _, err = pool.Exec(context.Background(), `INSERT INTO videos(uploaded_by_user_id,title,instructor_name,visibility,content_basis,object_key,original_filename,mime_type,byte_size)VALUES($1,'Invalid','Coach','shared','personal_purchase','invalid.mp4','invalid.mp4','video/mp4',1)`, instructor.id); err == nil {
 		t.Fatal("database accepted shared personal purchase")
+	}
+}
+
+func TestCatalogIsIsolatedByOrganizationAndCanBeShared(t *testing.T) {
+	store, pool := videoTestStore(t)
+	first := videoIdentity(t, pool, "first-gym@example.com", "admin")
+	var secondOrganizationID string
+	if err := pool.QueryRow(context.Background(), `INSERT INTO organizations(name,slug)VALUES('Second Gym','second-gym') ON CONFLICT(slug)DO UPDATE SET name=EXCLUDED.name RETURNING id`).Scan(&secondOrganizationID); err != nil {
+		t.Fatal(err)
+	}
+	var secondUserID string
+	if err := pool.QueryRow(context.Background(), `INSERT INTO users(email,password_hash,role,organization_id)VALUES('second-admin@example.com','hash','admin',$1)RETURNING id`, secondOrganizationID).Scan(&secondUserID); err != nil {
+		t.Fatal(err)
+	}
+	create := func(uploaderID, title, key string) string {
+		var id string
+		if err := pool.QueryRow(context.Background(), `INSERT INTO videos(uploaded_by_user_id,title,instructor_name,visibility,content_basis,object_key,original_filename,mime_type,byte_size,status)VALUES($1,$2,'Coach','shared','self_created',$3,$3,'video/mp4',10,'ready')RETURNING id`, uploaderID, title, key).Scan(&id); err != nil {
+			t.Fatal(err)
+		}
+		return id
+	}
+	firstVideoID := create(first.id, "First gym video", "first-gym.mp4")
+	create(secondUserID, "Second gym video", "second-gym.mp4")
+	firstUser, err := users.NewStore(pool).Get(context.Background(), first.id)
+	if err != nil {
+		t.Fatal(err)
+	}
+	firstCatalog, err := store.List(context.Background(), first.id, "admin", firstUser.OrganizationID, false, "")
+	if err != nil || len(firstCatalog) != 1 || firstCatalog[0].Title != "First gym video" {
+		t.Fatalf("first catalog=%+v err=%v", firstCatalog, err)
+	}
+	secondCatalog, err := store.List(context.Background(), secondUserID, "admin", &secondOrganizationID, false, "")
+	if err != nil || len(secondCatalog) != 1 || secondCatalog[0].Title != "Second gym video" {
+		t.Fatalf("second catalog=%+v err=%v", secondCatalog, err)
+	}
+	if _, err = pool.Exec(context.Background(), `INSERT INTO video_organizations(video_id,organization_id)VALUES($1,$2)`, firstVideoID, secondOrganizationID); err != nil {
+		t.Fatal(err)
+	}
+	secondCatalog, err = store.List(context.Background(), secondUserID, "admin", &secondOrganizationID, false, "")
+	if err != nil || len(secondCatalog) != 2 {
+		t.Fatalf("shared catalog=%+v err=%v", secondCatalog, err)
 	}
 }
 

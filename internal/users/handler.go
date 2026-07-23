@@ -42,10 +42,11 @@ func (h *Handler) actor(w http.ResponseWriter, r *http.Request, csrf bool) (auth
 	return session, true
 }
 func (h *Handler) list(w http.ResponseWriter, r *http.Request) {
-	if _, ok := h.actor(w, r, false); !ok {
+	session, ok := h.actor(w, r, false)
+	if !ok {
 		return
 	}
-	users, err := h.store.List(r.Context())
+	users, err := h.store.ListFor(r.Context(), session.User.ID)
 	if err != nil {
 		serverError(w)
 		return
@@ -58,9 +59,10 @@ func (h *Handler) create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var input struct {
-		Email    string `json:"email"`
-		Role     string `json:"role"`
-		Password string `json:"password"`
+		Email          string  `json:"email"`
+		Role           string  `json:"role"`
+		Password       string  `json:"password"`
+		OrganizationID *string `json:"organization_id"`
 	}
 	if decode(r, &input) != nil || !auth.ValidEmail(input.Email) || auth.ValidatePassword(input.Password) != nil {
 		badRequest(w, "invalid user")
@@ -71,7 +73,10 @@ func (h *Handler) create(w http.ResponseWriter, r *http.Request) {
 		badRequest(w, "invalid user")
 		return
 	}
-	user, err := h.store.Create(r.Context(), session.User.ID, input.Email, input.Role, hash, r.Header.Get("X-Request-ID"))
+	if !session.User.IsPlatformOwner {
+		input.OrganizationID = nil
+	}
+	user, err := h.store.CreateInOrganization(r.Context(), session.User.ID, input.Email, input.Role, hash, input.OrganizationID, r.Header.Get("X-Request-ID"))
 	if err == ErrConflict {
 		badRequest(w, "email or role conflicts with an existing account")
 		return
@@ -85,6 +90,10 @@ func (h *Handler) create(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) update(w http.ResponseWriter, r *http.Request) {
 	session, ok := h.actor(w, r, true)
 	if !ok {
+		return
+	}
+	if !h.store.CanManage(r.Context(), session.User.ID, r.PathValue("id")) {
+		notFound(w)
 		return
 	}
 	var input struct {
@@ -115,6 +124,10 @@ func (h *Handler) revoke(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
+	if !h.store.CanManage(r.Context(), session.User.ID, r.PathValue("id")) {
+		notFound(w)
+		return
+	}
 	err := h.store.RevokeSessions(r.Context(), session.User.ID, r.PathValue("id"), r.Header.Get("X-Request-ID"))
 	if err == ErrNotFound {
 		notFound(w)
@@ -129,6 +142,10 @@ func (h *Handler) revoke(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) resetPassword(w http.ResponseWriter, r *http.Request) {
 	session, ok := h.actor(w, r, true)
 	if !ok {
+		return
+	}
+	if !h.store.CanManage(r.Context(), session.User.ID, r.PathValue("id")) {
+		notFound(w)
 		return
 	}
 	var input struct {

@@ -68,7 +68,7 @@ func (h *Handler) list(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	values, err := h.store.List(r.Context(), session.User.ID, session.User.Role, strings.TrimSpace(r.URL.Query().Get("q")))
+	values, err := h.store.List(r.Context(), session.User.ID, session.User.Role, session.User.OrganizationID, session.User.IsPlatformOwner, strings.TrimSpace(r.URL.Query().Get("q")))
 	if err != nil {
 		serverError(w)
 		return
@@ -140,7 +140,7 @@ func (h *Handler) complete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	video, err := h.store.Get(r.Context(), r.PathValue("id"))
-	if err != nil || !h.policy.ManageVideo(actor(session), policyVideo(video)) {
+	if err != nil || !h.store.CanManage(video, session.User.ID, session.User.Role, session.User.OrganizationID, session.User.IsPlatformOwner) {
 		notFound(w)
 		return
 	}
@@ -167,7 +167,7 @@ func (h *Handler) update(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	video, err := h.store.Get(r.Context(), r.PathValue("id"))
-	if err != nil || !h.policy.ManageVideo(actor(session), policyVideo(video)) {
+	if err != nil || !h.store.CanManage(video, session.User.ID, session.User.Role, session.User.OrganizationID, session.User.IsPlatformOwner) {
 		notFound(w)
 		return
 	}
@@ -269,7 +269,7 @@ func (h *Handler) thumbnail(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	video, err := h.store.Get(r.Context(), r.PathValue("id"))
-	if err != nil || video.ThumbnailObjectKey == nil || !video.ThumbnailReady || !h.policy.ViewVideo(actor(session), policyVideo(video)) {
+	if err != nil || video.ThumbnailObjectKey == nil || !video.ThumbnailReady || !h.store.CanView(r.Context(), video, session.User.ID, session.User.Role, session.User.OrganizationID, session.User.IsPlatformOwner) {
 		notFound(w)
 		return
 	}
@@ -287,7 +287,7 @@ func (h *Handler) managedVideo(w http.ResponseWriter, r *http.Request) (auth.Ses
 		return auth.Session{}, Video{}, false
 	}
 	video, err := h.store.Get(r.Context(), r.PathValue("id"))
-	if err != nil || !h.policy.ManageVideo(actor(session), policyVideo(video)) {
+	if err != nil || !h.store.CanManage(video, session.User.ID, session.User.Role, session.User.OrganizationID, session.User.IsPlatformOwner) {
 		notFound(w)
 		return auth.Session{}, Video{}, false
 	}

@@ -355,7 +355,6 @@ Gate:
 
 - Email invitations and password recovery
 - Per-group library membership
-- Multiple organizations or gyms
 - FFmpeg, `ffprobe`, transcoding, remuxing, server-side thumbnail extraction,
   and workers
 - Multipart/resumable uploads and files larger than 5 GiB
@@ -371,6 +370,17 @@ Gate:
 
 Add a deferred feature only after the working MVP exposes a concrete problem it
 solves.
+
+## Approved post-MVP extension — gym isolation
+
+- Every normal user belongs to exactly one gym organization.
+- The designated platform owner is platform-scoped and belongs to no gym.
+- Gym administrators manage only users and content owned by their gym.
+- Videos and courses may be made available to multiple gyms only by the
+  platform owner.
+- Tenant isolation must be enforced in the Go API for catalog metadata,
+  thumbnails, playback URLs, courses, progress, notes, and Watch Later.
+- `personal_purchase` content must not be shared with additional gyms.
 
 ## Manual tasks for the user
 

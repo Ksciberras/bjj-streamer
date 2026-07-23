@@ -17,9 +17,9 @@ import (
 	"github.com/kyransciberras/bjj-streaming/internal/database"
 	"github.com/kyransciberras/bjj-streaming/internal/httpserver"
 	"github.com/kyransciberras/bjj-streaming/internal/learning"
-	"github.com/kyransciberras/bjj-streaming/internal/libraries"
 	"github.com/kyransciberras/bjj-streaming/internal/logging"
 	"github.com/kyransciberras/bjj-streaming/internal/objectstorage"
+	"github.com/kyransciberras/bjj-streaming/internal/organizations"
 	"github.com/kyransciberras/bjj-streaming/internal/users"
 	"github.com/kyransciberras/bjj-streaming/internal/videos"
 )
@@ -55,7 +55,6 @@ func run() error {
 	}
 	userStore := users.NewStore(db)
 	userHandler := users.NewHandler(userStore, authHandler)
-	libraryHandler := libraries.NewHandler(libraries.NewStore(db), userStore, authHandler)
 	auditHandler := audit.NewHandler(audit.NewStore(db), authHandler)
 	objects, err := objectstorage.New(context.Background(), cfg.ObjectEndpoint, cfg.ObjectPublicEndpoint, cfg.ObjectRegion, cfg.ObjectBucket, cfg.ObjectAccessKey, cfg.ObjectSecretKey, cfg.ObjectPathStyle, cfg.UploadURLTTL)
 	if err != nil {
@@ -65,9 +64,10 @@ func run() error {
 	videoHandler := videos.NewHandler(videoStore, objects, authHandler)
 	learningHandler := learning.NewHandler(learning.NewStore(db), videoStore, objects, authHandler)
 	courseHandler := courses.NewHandler(courses.NewStore(db), videoStore, authHandler)
+	organizationHandler := organizations.NewHandler(db, authHandler)
 
 	server := &http.Server{
-		Addr: cfg.HTTPAddr, Handler: httpserver.New(logger, db, authHandler, userHandler, libraryHandler, auditHandler, videoHandler, learningHandler, courseHandler),
+		Addr: cfg.HTTPAddr, Handler: httpserver.New(logger, db, authHandler, userHandler, auditHandler, videoHandler, learningHandler, courseHandler, organizationHandler),
 		ReadHeaderTimeout: 5 * time.Second, ReadTimeout: 15 * time.Second,
 		WriteTimeout: 15 * time.Second, IdleTimeout: 60 * time.Second,
 	}

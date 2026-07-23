@@ -23,7 +23,7 @@ func (h *Handler) list(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	if !h.policy.ViewAudit(authorization.Actor{ID: session.User.ID, Role: authorization.Role(session.User.Role)}) {
+	if !session.User.IsPlatformOwner {
 		writeJSON(w, http.StatusNotFound, map[string]string{"error": "not found"})
 		return
 	}

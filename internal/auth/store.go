@@ -53,7 +53,7 @@ func (s *Store) BootstrapAdmin(ctx context.Context, email, passwordHash string) 
 func (s *Store) PasswordHash(ctx context.Context, email string) (User, string, error) {
 	var user User
 	var hash string
-	err := s.db.QueryRow(ctx, `SELECT id,email,role,password_hash FROM users WHERE email=$1 AND disabled_at IS NULL`, normalizeEmail(email)).Scan(&user.ID, &user.Email, &user.Role, &hash)
+	err := s.db.QueryRow(ctx, `SELECT id,email,role,organization_id,is_platform_owner,password_hash FROM users WHERE email=$1 AND disabled_at IS NULL`, normalizeEmail(email)).Scan(&user.ID, &user.Email, &user.Role, &user.OrganizationID, &user.IsPlatformOwner, &hash)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return User{}, "", ErrInvalidCredentials
 	}
@@ -95,7 +95,7 @@ func (s *Store) CreateSession(ctx context.Context, userID, oldToken string, sett
 func (s *Store) Authenticate(ctx context.Context, token string, idleTTL time.Duration) (Session, error) {
 	now := s.now()
 	var session Session
-	err := s.db.QueryRow(ctx, `UPDATE sessions s SET last_seen_at=$2, idle_expires_at=LEAST(s.expires_at,$3) FROM users u WHERE s.token_hash=$1 AND s.user_id=u.id AND s.revoked_at IS NULL AND s.expires_at>$2 AND s.idle_expires_at>$2 AND u.disabled_at IS NULL RETURNING s.id,u.id,u.email,u.role,s.csrf_hash,s.expires_at`, tokenHash(token), now, now.Add(idleTTL)).Scan(&session.ID, &session.User.ID, &session.User.Email, &session.User.Role, &session.CSRFHash, &session.ExpiresAt)
+	err := s.db.QueryRow(ctx, `UPDATE sessions s SET last_seen_at=$2, idle_expires_at=LEAST(s.expires_at,$3) FROM users u WHERE s.token_hash=$1 AND s.user_id=u.id AND s.revoked_at IS NULL AND s.expires_at>$2 AND s.idle_expires_at>$2 AND u.disabled_at IS NULL RETURNING s.id,u.id,u.email,u.role,u.organization_id,u.is_platform_owner,s.csrf_hash,s.expires_at`, tokenHash(token), now, now.Add(idleTTL)).Scan(&session.ID, &session.User.ID, &session.User.Email, &session.User.Role, &session.User.OrganizationID, &session.User.IsPlatformOwner, &session.CSRFHash, &session.ExpiresAt)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return Session{}, ErrUnauthenticated
 	}
