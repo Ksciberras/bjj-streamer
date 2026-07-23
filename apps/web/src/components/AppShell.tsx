@@ -35,13 +35,13 @@ export function AppShell({ user, active, canUpload, onNavigate, onLogout, childr
 
     <header className="mobile-header">
       <Wordmark />
-      <MobileAccount user={user} onNavigate={onNavigate} onLogout={onLogout} />
+      <MobileAccount user={user} canUpload={canUpload} onNavigate={onNavigate} onLogout={onLogout} />
     </header>
 
     <main className="content" id="main-content">{children}</main>
 
     <nav className="mobile-nav" aria-label="Mobile navigation">
-      {primaryNavigation.filter((item) => item.id !== 'admin').map((item) =>
+      {primaryNavigation.filter((item) => item.id === 'home' || item.id === 'library').map((item) =>
         <NavigationButton key={item.id} item={item} active={active} onNavigate={onNavigate} />,
       )}
     </nav>
@@ -78,10 +78,11 @@ function DesktopAccount({ user, onLogout }: { user: User; onLogout: () => Promis
   </div>
 }
 
-function MobileAccount({ user, onNavigate, onLogout }: { user: User; onNavigate: (view: View) => void; onLogout: () => Promise<void> }) {
+function MobileAccount({ user, canUpload, onNavigate, onLogout }: { user: User; canUpload: boolean; onNavigate: (view: View) => void; onLogout: () => Promise<void> }) {
   return <details className="account-menu">
     <summary aria-label="Open account menu"><AccountAvatar user={user} /></summary>
     <div>
+      {canUpload && <button onClick={() => onNavigate('upload')}>Upload</button>}
       {user.role === 'admin' && <button onClick={() => onNavigate('admin')}>Admin</button>}
       <button onClick={() => void onLogout()}>Sign out</button>
     </div>

@@ -4,7 +4,7 @@ import { labelize } from '../lib/format'
 
 export function Wordmark({ detail = false }: { detail?: boolean }) {
   return <div className="wordmark" aria-label="RollStudy">
-    <strong><span>Roll</span><span>Study</span></strong>
+    <strong><span>Roll</span><i aria-hidden="true" /><span>Study</span></strong>
     {detail && <small>Watch. Note. Drill.</small>}
   </div>
 }

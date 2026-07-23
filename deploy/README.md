@@ -15,7 +15,11 @@ Manually create and verify:
 - Least-privilege Spaces credentials for that bucket.
 - Billing and resource alerts.
 
-Configure Spaces CORS to allow `https://rollstudy.online` to use `PUT`, `GET`, and `HEAD`, allow the `Content-Type` and `Range` headers, and expose `ETag`, `Accept-Ranges`, `Content-Length`, and `Content-Range`. Do not enable public listing or anonymous object access.
+Configure Spaces CORS to allow `https://rollstudy.online` to use `PUT`, `GET`,
+and `HEAD`, allow the `Content-Type` and `Range` headers, and expose `ETag`,
+`Accept-Ranges`, `Content-Length`, and `Content-Range`. These methods cover
+direct MP4 and thumbnail uploads plus authorized playback and thumbnail
+display. Do not enable public listing or anonymous object access.
 
 ## Configure the server
 

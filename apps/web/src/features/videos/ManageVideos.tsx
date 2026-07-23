@@ -2,6 +2,7 @@ import type { FormEvent } from 'react'
 import { EmptyState, SectionHeading } from '../../components/ui'
 import { api, errorMessage } from '../../lib/api'
 import { labelize } from '../../lib/format'
+import { uploadToStorage } from '../../lib/objectUpload'
 import type { Video } from '../../types'
 
 type ManageVideosProps = {
@@ -11,6 +12,28 @@ type ManageVideosProps = {
 }
 
 export function ManageVideos({ videos, onUpdate, onError }: ManageVideosProps) {
+  async function uploadThumbnail(video: Video, file: File) {
+    if (file.size === 0) return
+    try {
+      const body = await api(`/api/videos/${video.id}/thumbnail-upload-request`, {
+        method: 'POST',
+        body: JSON.stringify({
+          filename: file.name,
+          mime_type: file.type,
+          byte_size: file.size,
+        }),
+      })
+      await uploadToStorage(body.upload_url, file, () => undefined)
+      await api(`/api/videos/${video.id}/thumbnail-complete`, {
+        method: 'POST',
+        body: '{}',
+      })
+      await onUpdate()
+    } catch (reason) {
+      onError(errorMessage(reason, 'Unable to upload thumbnail'))
+    }
+  }
+
   async function updateVideo(event: FormEvent<HTMLFormElement>, video: Video) {
     event.preventDefault()
     const data = new FormData(event.currentTarget)
@@ -89,6 +112,17 @@ export function ManageVideos({ videos, onUpdate, onError }: ManageVideosProps) {
                       </label>
                       <label className="check">
                         <input name="archived" type="checkbox" /> Archive video
+                      </label>
+                      <label>
+                        Replace thumbnail
+                        <input
+                          type="file"
+                          accept="image/jpeg,image/png,image/webp,.jpg,.jpeg,.png,.webp"
+                          onChange={(event) => {
+                            const file = event.target.files?.[0]
+                            if (file) void uploadThumbnail(video, file)
+                          }}
+                        />
                       </label>
                       <button type="submit">Save</button>
                     </form>

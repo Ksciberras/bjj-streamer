@@ -128,6 +128,9 @@ function ContinueCard({ video, savedAt, onResume }: { video: Video; savedAt: num
 }
 
 function VideoPlaceholder({ video, label }: { video: Video; label: string }) {
+  if (video.thumbnail_url) {
+    return <img className="video-thumbnail" src={video.thumbnail_url} alt="" loading="lazy" />
+  }
   return <span className="video-placeholder" aria-hidden="true">
     <strong>{initials(video.instructor_name)}</strong>
     <small>{label}</small>

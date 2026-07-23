@@ -16,8 +16,10 @@ import (
 )
 
 const maxUploadSize int64 = 5 * 1024 * 1024 * 1024
+const maxThumbnailSize int64 = 5 * 1024 * 1024
 
 type Objects interface {
+	PresignGet(ctx context.Context, key string) (string, error)
 	PresignPut(ctx context.Context, key, contentType string, size int64) (string, error)
 	Head(ctx context.Context, key string) (objectstorage.Object, error)
 }
@@ -38,6 +40,9 @@ func (h *Handler) Register(mux *http.ServeMux) {
 	mux.HandleFunc("POST /api/videos/upload-requests", h.createUpload)
 	mux.HandleFunc("POST /api/videos/{id}/complete", h.complete)
 	mux.HandleFunc("PATCH /api/videos/{id}", h.update)
+	mux.HandleFunc("POST /api/videos/{id}/thumbnail-upload-request", h.createThumbnailUpload)
+	mux.HandleFunc("POST /api/videos/{id}/thumbnail-complete", h.completeThumbnail)
+	mux.HandleFunc("GET /api/videos/{id}/thumbnail", h.thumbnail)
 }
 
 func actor(session auth.Session) authorization.Actor {
@@ -68,7 +73,16 @@ func (h *Handler) list(w http.ResponseWriter, r *http.Request) {
 		serverError(w)
 		return
 	}
+	for index := range values {
+		setThumbnailURL(&values[index])
+	}
 	writeJSON(w, http.StatusOK, map[string]any{"videos": values})
+}
+
+func setThumbnailURL(video *Video) {
+	if video.ThumbnailObjectKey != nil {
+		video.ThumbnailURL = "/api/videos/" + video.ID + "/thumbnail"
+	}
 }
 
 type metadataInput struct {
@@ -173,6 +187,115 @@ func (h *Handler) update(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{"video": updated})
 }
 
+type thumbnailInput struct {
+	Filename string `json:"filename"`
+	MIMEType string `json:"mime_type"`
+	ByteSize int64  `json:"byte_size"`
+}
+
+var thumbnailExtensions = map[string]string{
+	"image/jpeg": ".jpg",
+	"image/png":  ".png",
+	"image/webp": ".webp",
+}
+
+func (h *Handler) createThumbnailUpload(w http.ResponseWriter, r *http.Request) {
+	session, video, ok := h.managedVideo(w, r)
+	if !ok {
+		return
+	}
+	var input thumbnailInput
+	if decode(r, &input) != nil {
+		badRequest(w)
+		return
+	}
+	extension, valid := thumbnailExtensions[input.MIMEType]
+	fileExtension := strings.ToLower(filepath.Ext(input.Filename))
+	if !valid || input.ByteSize <= 0 || input.ByteSize > maxThumbnailSize ||
+		!validThumbnailExtension(input.MIMEType, fileExtension) ||
+		filepath.Base(input.Filename) != input.Filename || len(input.Filename) > 255 {
+		badRequest(w)
+		return
+	}
+	key, err := generatedObjectKey("thumbnails/", extension)
+	if err != nil {
+		serverError(w)
+		return
+	}
+	url, err := h.objects.PresignPut(r.Context(), key, input.MIMEType, input.ByteSize)
+	if err != nil {
+		serverError(w)
+		return
+	}
+	video, err = h.store.SetThumbnail(r.Context(), session.User.ID, video.ID, key, r.Header.Get("X-Request-ID"))
+	if err != nil {
+		serverError(w)
+		return
+	}
+	setThumbnailURL(&video)
+	writeJSON(w, http.StatusCreated, map[string]any{"video": video, "upload_url": url})
+}
+
+func (h *Handler) completeThumbnail(w http.ResponseWriter, r *http.Request) {
+	_, video, ok := h.managedVideo(w, r)
+	if !ok {
+		return
+	}
+	if video.ThumbnailObjectKey == nil {
+		badRequest(w)
+		return
+	}
+	object, err := h.objects.Head(r.Context(), *video.ThumbnailObjectKey)
+	if err != nil || object.Size <= 0 || object.Size > maxThumbnailSize {
+		badRequest(w)
+		return
+	}
+	if _, valid := thumbnailExtensions[object.ContentType]; !valid {
+		badRequest(w)
+		return
+	}
+	setThumbnailURL(&video)
+	writeJSON(w, http.StatusOK, map[string]any{"video": video})
+}
+
+func (h *Handler) thumbnail(w http.ResponseWriter, r *http.Request) {
+	session, ok := h.session(w, r, false)
+	if !ok {
+		return
+	}
+	video, err := h.store.Get(r.Context(), r.PathValue("id"))
+	if err != nil || video.ThumbnailObjectKey == nil || !h.policy.ViewVideo(actor(session), policyVideo(video)) {
+		notFound(w)
+		return
+	}
+	url, err := h.objects.PresignGet(r.Context(), *video.ThumbnailObjectKey)
+	if err != nil {
+		serverError(w)
+		return
+	}
+	http.Redirect(w, r, url, http.StatusFound)
+}
+
+func (h *Handler) managedVideo(w http.ResponseWriter, r *http.Request) (auth.Session, Video, bool) {
+	session, ok := h.session(w, r, true)
+	if !ok {
+		return auth.Session{}, Video{}, false
+	}
+	video, err := h.store.Get(r.Context(), r.PathValue("id"))
+	if err != nil || !h.policy.ManageVideo(actor(session), policyVideo(video)) {
+		notFound(w)
+		return auth.Session{}, Video{}, false
+	}
+	return session, video, true
+}
+
+func validThumbnailExtension(mime, extension string) bool {
+	if mime == "image/jpeg" {
+		return extension == ".jpg" || extension == ".jpeg"
+	}
+	return thumbnailExtensions[mime] == extension
+}
+
 func validMetadata(input metadataInput) bool {
 	if length(input.Title, 1, 200) == false || length(input.InstructorName, 1, 200) == false || len(input.Description) > 10000 || (input.Visibility != "shared" && input.Visibility != "private") || (input.ContentBasis != "self_created" && input.ContentBasis != "licensed_for_group" && input.ContentBasis != "personal_purchase") || (input.ContentBasis == "personal_purchase" && input.Visibility != "private") || len(input.Tags) > 30 {
 		return false
@@ -219,11 +342,15 @@ func cleanTags(tags []string) []string {
 	return result
 }
 func objectKey() (string, error) {
+	return generatedObjectKey("videos/", ".mp4")
+}
+
+func generatedObjectKey(prefix, extension string) (string, error) {
 	raw := make([]byte, 16)
 	if _, err := rand.Read(raw); err != nil {
 		return "", err
 	}
-	return "videos/" + hex.EncodeToString(raw) + ".mp4", nil
+	return prefix + hex.EncodeToString(raw) + extension, nil
 }
 func decode(r *http.Request, target any) error {
 	decoder := json.NewDecoder(io.LimitReader(r.Body, 1<<20))

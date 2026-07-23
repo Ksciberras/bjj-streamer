@@ -23,6 +23,9 @@ type fakeObjects struct {
 func (fakeObjects) PresignPut(context.Context, string, string, int64) (string, error) {
 	return "http://storage.example/upload", nil
 }
+func (fakeObjects) PresignGet(context.Context, string) (string, error) {
+	return "http://storage.example/thumbnail", nil
+}
 func (f fakeObjects) Head(context.Context, string) (objectstorage.Object, error) {
 	return f.object, f.headErr
 }
@@ -128,6 +131,32 @@ func TestUploadAuthorizationCompletionVisibilityAndSearch(t *testing.T) {
 	if response := serveVideo(mux, videoRequest(t, http.MethodPost, "/api/videos/"+payload.Video.ID+"/complete", map[string]any{}, instructor)); response.Code != http.StatusOK {
 		t.Fatalf("complete=%d %s", response.Code, response.Body.String())
 	}
+	thumbnail := map[string]any{
+		"filename":  "armbar.webp",
+		"mime_type": "image/webp",
+		"byte_size": 2048,
+	}
+	thumbnailPath := "/api/videos/" + payload.Video.ID + "/thumbnail-upload-request"
+	if response := serveVideo(mux, videoRequest(t, http.MethodPost, thumbnailPath, thumbnail, student)); response.Code != http.StatusNotFound {
+		t.Fatalf("student thumbnail upload=%d", response.Code)
+	}
+	if response := serveVideo(mux, videoRequest(t, http.MethodPost, thumbnailPath, thumbnail, other)); response.Code != http.StatusNotFound {
+		t.Fatalf("other thumbnail upload=%d", response.Code)
+	}
+	thumbnail["byte_size"] = maxThumbnailSize + 1
+	if response := serveVideo(mux, videoRequest(t, http.MethodPost, thumbnailPath, thumbnail, instructor)); response.Code != http.StatusBadRequest {
+		t.Fatalf("oversized thumbnail=%d", response.Code)
+	}
+	thumbnail["byte_size"] = 2048
+	if response := serveVideo(mux, videoRequest(t, http.MethodPost, thumbnailPath, thumbnail, instructor)); response.Code != http.StatusCreated {
+		t.Fatalf("thumbnail request=%d %s", response.Code, response.Body.String())
+	}
+	if response := serveVideo(mux, videoRequest(t, http.MethodGet, "/api/videos/"+payload.Video.ID+"/thumbnail", nil, student)); response.Code != http.StatusNotFound {
+		t.Fatalf("private thumbnail leaked=%d", response.Code)
+	}
+	if response := serveVideo(mux, videoRequest(t, http.MethodGet, "/api/videos/"+payload.Video.ID+"/thumbnail", nil, admin)); response.Code != http.StatusFound {
+		t.Fatalf("admin thumbnail=%d", response.Code)
+	}
 	if response := serveVideo(mux, videoRequest(t, http.MethodGet, "/api/videos?q=armbar", nil, student)); response.Code != http.StatusOK || bytes.Contains(response.Body.Bytes(), []byte("Armbar Study")) {
 		t.Fatalf("private leaked: %d %s", response.Code, response.Body.String())
 	}
@@ -192,8 +221,43 @@ func TestDirectUploadAgainstLocalObjectStorage(t *testing.T) {
 	if completed.Code != http.StatusOK {
 		t.Fatalf("complete=%d %s", completed.Code, completed.Body.String())
 	}
+	thumbnail := []byte("small png thumbnail")
+	thumbnailRequest := serveVideo(
+		mux,
+		videoRequest(t, http.MethodPost, "/api/videos/"+payload.Video.ID+"/thumbnail-upload-request", map[string]any{
+			"filename":  "direct.png",
+			"mime_type": "image/png",
+			"byte_size": len(thumbnail),
+		}, instructor),
+	)
+	if thumbnailRequest.Code != http.StatusCreated {
+		t.Fatalf("thumbnail request=%d %s", thumbnailRequest.Code, thumbnailRequest.Body.String())
+	}
+	var thumbnailPayload struct {
+		UploadURL string `json:"upload_url"`
+	}
+	if err = json.Unmarshal(thumbnailRequest.Body.Bytes(), &thumbnailPayload); err != nil {
+		t.Fatal(err)
+	}
+	thumbnailPut, err := http.NewRequest(http.MethodPut, thumbnailPayload.UploadURL, bytes.NewReader(thumbnail))
+	if err != nil {
+		t.Fatal(err)
+	}
+	thumbnailPut.Header.Set("Content-Type", "image/png")
+	thumbnailResponse, err := http.DefaultClient.Do(thumbnailPut)
+	if err != nil {
+		t.Fatal(err)
+	}
+	thumbnailResponse.Body.Close()
+	if thumbnailResponse.StatusCode < 200 || thumbnailResponse.StatusCode >= 300 {
+		t.Fatalf("thumbnail put=%d", thumbnailResponse.StatusCode)
+	}
+	thumbnailComplete := serveVideo(mux, videoRequest(t, http.MethodPost, "/api/videos/"+payload.Video.ID+"/thumbnail-complete", map[string]any{}, instructor))
+	if thumbnailComplete.Code != http.StatusOK {
+		t.Fatalf("thumbnail complete=%d %s", thumbnailComplete.Code, thumbnailComplete.Body.String())
+	}
 	listed := serveVideo(mux, videoRequest(t, http.MethodGet, "/api/videos?q=direct", nil, instructor))
-	if listed.Code != http.StatusOK || !bytes.Contains(listed.Body.Bytes(), []byte("Direct Upload")) {
+	if listed.Code != http.StatusOK || !bytes.Contains(listed.Body.Bytes(), []byte("Direct Upload")) || !bytes.Contains(listed.Body.Bytes(), []byte("thumbnail_url")) {
 		t.Fatalf("list=%d %s", listed.Code, listed.Body.String())
 	}
 }

@@ -13,23 +13,25 @@ import (
 var ErrNotFound = errors.New("not found")
 
 type Video struct {
-	ID                string    `json:"id"`
-	UploadedByUserID  string    `json:"uploaded_by_user_id"`
-	Title             string    `json:"title"`
-	InstructorName    string    `json:"instructor_name"`
-	InstructionalName *string   `json:"instructional_name,omitempty"`
-	ChapterName       *string   `json:"chapter_name,omitempty"`
-	Description       string    `json:"description"`
-	Tags              []string  `json:"tags"`
-	Visibility        string    `json:"visibility"`
-	ContentBasis      string    `json:"content_basis"`
-	ObjectKey         string    `json:"-"`
-	OriginalFilename  string    `json:"original_filename"`
-	MIMEType          string    `json:"mime_type"`
-	ByteSize          int64     `json:"byte_size"`
-	Status            string    `json:"status"`
-	CreatedAt         time.Time `json:"created_at"`
-	UpdatedAt         time.Time `json:"updated_at"`
+	ID                 string    `json:"id"`
+	UploadedByUserID   string    `json:"uploaded_by_user_id"`
+	Title              string    `json:"title"`
+	InstructorName     string    `json:"instructor_name"`
+	InstructionalName  *string   `json:"instructional_name,omitempty"`
+	ChapterName        *string   `json:"chapter_name,omitempty"`
+	Description        string    `json:"description"`
+	Tags               []string  `json:"tags"`
+	Visibility         string    `json:"visibility"`
+	ContentBasis       string    `json:"content_basis"`
+	ObjectKey          string    `json:"-"`
+	ThumbnailObjectKey *string   `json:"-"`
+	ThumbnailURL       string    `json:"thumbnail_url,omitempty"`
+	OriginalFilename   string    `json:"original_filename"`
+	MIMEType           string    `json:"mime_type"`
+	ByteSize           int64     `json:"byte_size"`
+	Status             string    `json:"status"`
+	CreatedAt          time.Time `json:"created_at"`
+	UpdatedAt          time.Time `json:"updated_at"`
 }
 
 type CreateInput struct {
@@ -44,12 +46,34 @@ type Store struct{ db *pgxpool.Pool }
 
 func NewStore(db *pgxpool.Pool) *Store { return &Store{db: db} }
 
-const columns = `id,uploaded_by_user_id,title,instructor_name,instructional_name,chapter_name,description,tags,visibility,content_basis,object_key,original_filename,mime_type,byte_size,status,created_at,updated_at`
+const columns = `id,uploaded_by_user_id,title,instructor_name,instructional_name,chapter_name,description,tags,visibility,content_basis,object_key,thumbnail_object_key,original_filename,mime_type,byte_size,status,created_at,updated_at`
 
 func scan(row pgx.Row) (Video, error) {
 	var video Video
-	err := row.Scan(&video.ID, &video.UploadedByUserID, &video.Title, &video.InstructorName, &video.InstructionalName, &video.ChapterName, &video.Description, &video.Tags, &video.Visibility, &video.ContentBasis, &video.ObjectKey, &video.OriginalFilename, &video.MIMEType, &video.ByteSize, &video.Status, &video.CreatedAt, &video.UpdatedAt)
+	err := row.Scan(&video.ID, &video.UploadedByUserID, &video.Title, &video.InstructorName, &video.InstructionalName, &video.ChapterName, &video.Description, &video.Tags, &video.Visibility, &video.ContentBasis, &video.ObjectKey, &video.ThumbnailObjectKey, &video.OriginalFilename, &video.MIMEType, &video.ByteSize, &video.Status, &video.CreatedAt, &video.UpdatedAt)
 	return video, err
+}
+
+func (s *Store) SetThumbnail(ctx context.Context, actorID, id, key, requestID string) (Video, error) {
+	tx, err := s.db.Begin(ctx)
+	if err != nil {
+		return Video{}, err
+	}
+	defer tx.Rollback(ctx)
+	video, err := scan(tx.QueryRow(ctx, `UPDATE videos SET thumbnail_object_key=$2,updated_at=CURRENT_TIMESTAMP WHERE id=$1 RETURNING `+columns, id, key))
+	if errors.Is(err, pgx.ErrNoRows) {
+		return Video{}, ErrNotFound
+	}
+	if err != nil {
+		return Video{}, err
+	}
+	if err = audit.Record(ctx, tx, actorID, "video.thumbnail_requested", "video", id, requestID, map[string]any{}); err != nil {
+		return Video{}, err
+	}
+	if err = tx.Commit(ctx); err != nil {
+		return Video{}, err
+	}
+	return video, nil
 }
 
 func (s *Store) Create(ctx context.Context, actorID string, input CreateInput, requestID string) (Video, error) {

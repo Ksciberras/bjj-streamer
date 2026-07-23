@@ -2,6 +2,7 @@ import { useState, type FormEvent } from 'react'
 import { PageHeader } from '../../components/ui'
 import { api, errorMessage } from '../../lib/api'
 import { formatBytes } from '../../lib/format'
+import { uploadToStorage } from '../../lib/objectUpload'
 import type { User, Video } from '../../types'
 import { ManageVideos } from '../videos/ManageVideos'
 
@@ -13,30 +14,6 @@ type UploadScreenProps = {
   onUpdate: () => Promise<void>
 }
 
-function uploadToStorage(
-  url: string,
-  file: File,
-  onProgress: (percentage: number) => void,
-) {
-  return new Promise<void>((resolve, reject) => {
-    const request = new XMLHttpRequest()
-    request.open('PUT', url)
-    request.setRequestHeader('Content-Type', 'video/mp4')
-    request.upload.onprogress = (event) => {
-      if (event.lengthComputable) {
-        onProgress(Math.round((event.loaded / event.total) * 100))
-      }
-    }
-    request.onload = () => {
-      if (request.status >= 200 && request.status < 300) resolve()
-      else reject(new Error('The storage upload failed. Try again.'))
-    }
-    request.onerror = () =>
-      reject(new Error('The storage upload failed. Check your connection and try again.'))
-    request.send(file)
-  })
-}
-
 export function UploadScreen({
   user,
   videos,
@@ -45,6 +22,7 @@ export function UploadScreen({
   onUpdate,
 }: UploadScreenProps) {
   const [file, setFile] = useState<File | null>(null)
+  const [thumbnail, setThumbnail] = useState<File | null>(null)
   const [progress, setProgress] = useState<number | null>(null)
   const [state, setState] = useState<'idle' | 'uploading' | 'success' | 'error'>('idle')
 
@@ -86,8 +64,27 @@ export function UploadScreen({
 
       await uploadToStorage(body.upload_url, chosen, setProgress)
       await api(`/api/videos/${body.video.id}/complete`, { method: 'POST', body: '{}' })
+      if (thumbnail) {
+        const thumbnailUpload = await api(
+          `/api/videos/${body.video.id}/thumbnail-upload-request`,
+          {
+            method: 'POST',
+            body: JSON.stringify({
+              filename: thumbnail.name,
+              mime_type: thumbnail.type,
+              byte_size: thumbnail.size,
+            }),
+          },
+        )
+        await uploadToStorage(thumbnailUpload.upload_url, thumbnail, () => undefined)
+        await api(`/api/videos/${body.video.id}/thumbnail-complete`, {
+          method: 'POST',
+          body: '{}',
+        })
+      }
       form.reset()
       setFile(null)
+      setThumbnail(null)
       setProgress(100)
       setState('success')
       await onUploaded()
@@ -135,6 +132,16 @@ export function UploadScreen({
                 <label>Chapter<input name="chapter_name" maxLength={200} /></label>
                 <label className="full">Description<textarea name="description" maxLength={10000} /></label>
                 <label className="full">Tags, comma separated<input name="tags" /></label>
+                <label className="full">
+                  Thumbnail (optional)
+                  <input
+                    name="thumbnail"
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp,.jpg,.jpeg,.png,.webp"
+                    onChange={(event) => setThumbnail(event.target.files?.[0] ?? null)}
+                  />
+                  <small>JPEG, PNG, or WebP up to 5 MiB.</small>
+                </label>
               </div>
             </div>
             <div className="form-step">

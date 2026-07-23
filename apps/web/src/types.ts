@@ -20,6 +20,7 @@ export type Video = {
   visibility: 'shared' | 'private'
   content_basis: 'self_created' | 'licensed_for_group' | 'personal_purchase'
   original_filename: string
+  thumbnail_url?: string
   byte_size: number
   status: 'pending_upload' | 'ready' | 'archived'
 }

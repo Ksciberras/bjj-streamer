@@ -28,6 +28,13 @@ Sign in through the browser. Administrators can create known user accounts, assi
 
 Administrators and instructors can upload browser-compatible `.mp4` files up to 5 GiB. The browser uploads bytes directly to object storage; they do not pass through the Go API. Students cannot request uploads. Shared ready videos appear to every authenticated user, while private videos appear only to their uploader and administrators. `personal_purchase` videos must be private.
 
+An uploader may also select a JPEG, PNG, or WebP thumbnail up to 5 MiB while
+creating a video, or replace it later from video management. Thumbnail bytes
+also upload directly to private object storage. Thumbnail URLs are short-lived
+and issued only after the API confirms that the current user can view the
+associated video. Existing videos without thumbnails continue to use the
+standard RollStudy placeholder.
+
 Select **Watch** to request an authorized short-lived playback URL. The native browser player resumes from your saved position, saves periodically and when paused or left, and supports private timestamped notes. Selecting a note seeks the player to that timestamp. Progress and notes are isolated per user.
 
 Stop the application without deleting PostgreSQL data:
@@ -76,7 +83,13 @@ OBJECT_PATH_STYLE=false
 UPLOAD_URL_TTL=15m
 ```
 
-Keep the bucket private and configure its CORS policy to allow `PUT` from the application origin with the `Content-Type` header. Credentials belong only in the API environment. Browser compatibility is the uploader's responsibility; the MVP validates the `.mp4` extension, `video/mp4` MIME type, declared size, and stored object metadata but does not inspect codecs or transcode files.
+Keep the bucket private and configure its CORS policy to allow `PUT` and `GET`
+from the application origin with the `Content-Type` header. Credentials belong
+only in the API environment. Browser compatibility is the uploader's
+responsibility; the MVP validates the `.mp4` extension, `video/mp4` MIME type,
+declared size, and stored object metadata but does not inspect codecs or
+transcode files. Thumbnail uploads validate JPEG, PNG, or WebP MIME types and
+extensions, enforce the 5 MiB limit, and verify stored metadata.
 
 Authentication uses Argon2id passwords, random server-side sessions stored only as token hashes, strict SameSite cookies, CSRF tokens for state-changing authenticated requests, and an in-process login limiter. The limiter resets when the API restarts and is suitable only for the single-Droplet MVP.
 
