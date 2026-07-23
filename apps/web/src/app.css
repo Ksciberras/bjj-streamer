@@ -247,8 +247,32 @@ td small { margin-top: .2rem; }
 .admin-create { display: grid; grid-template-columns: minmax(180px, .45fr) minmax(0, 1.55fr); gap: 2rem; padding: 1.5rem; }
 .admin-create h2 { margin: 0 0 .45rem; font-size: 1.05rem; }
 .admin-create p { max-width: 28ch; margin: 0; font-size: .75rem; }
-.account-create-form { display: grid; grid-template-columns: minmax(180px, 1fr) 140px minmax(180px, 1fr) auto; gap: .75rem; align-items: end; }
-.account-create-form.platform { grid-template-columns: minmax(180px, 1fr) 130px 160px minmax(180px, 1fr) auto; }
+.account-create-form,
+.account-create-form.platform {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: .9rem;
+  min-width: 0;
+}
+.account-create-form > label { min-width: 0; }
+.admin-form-actions {
+  grid-column: 1 / -1;
+  display: flex;
+  justify-content: flex-end;
+  padding-top: 1rem;
+  margin-top: .15rem;
+  border-top: 1px solid var(--border);
+}
+.admin-form-actions button {
+  min-width: 132px;
+  border-color: var(--accent);
+  background: var(--accent);
+  color: var(--accent-contrast);
+}
+.admin-form-actions button:hover:not(:disabled) {
+  border-color: var(--accent-hover);
+  background: var(--accent-hover);
+}
 .admin-count { color: var(--muted); font-size: .72rem; font-weight: 500; }
 .member-table table { min-width: 920px; }
 .member-table th:first-child, .member-table td:first-child { width: 24%; }
@@ -299,7 +323,6 @@ td small { margin-top: .2rem; }
   .study-layout { grid-template-columns: minmax(0, 2.2fr) minmax(280px, 1fr); }
   .admin-create { grid-template-columns: 1fr; }
   .account-create-form, .account-create-form.platform { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .account-create-form button { align-self: end; }
 }
 
 @media (max-width: 760px) {
@@ -350,6 +373,7 @@ td small { margin-top: .2rem; }
   .upload-submit { padding: 1rem; }
   .upload-submit > button { width: 100%; min-height: 46px; }
   .account-create-form, .account-create-form.platform { grid-template-columns: 1fr; }
+  .admin-form-actions button { width: 100%; }
   .login-page { padding: 1rem; }
   .login-card { padding: 1.5rem; }
 }
@@ -760,22 +784,31 @@ td small { margin-top: .2rem; }
 
 .gym-create-form {
   display: grid;
-  grid-template-columns: minmax(220px, 1fr) minmax(160px, .8fr) minmax(150px, .65fr) auto;
-  align-items: end;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: .9rem;
   padding: 1.1rem;
+  min-width: 0;
 }
 
 .gym-create-form > div {
+  grid-column: 1 / -1;
   display: grid;
   align-self: center;
   gap: .2rem;
 }
 
-.gym-create-form > div span,
+.gym-create-form > label {
+  min-width: 0;
+}
+
+.gym-create-form > div:not(.admin-form-actions) span,
 .gym-availability-heading p {
   color: var(--muted);
   font-size: .72rem;
+}
+
+.gym-create-form > .admin-form-actions {
+  display: flex;
 }
 
 .gym-availability-heading {

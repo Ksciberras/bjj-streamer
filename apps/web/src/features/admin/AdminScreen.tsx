@@ -124,7 +124,9 @@ export function AdminScreen({
             Temporary password
             <input name="password" type="password" minLength={12} required autoComplete="new-password" />
           </label>
-          <button type="submit">Create member</button>
+          <div className="admin-form-actions">
+            <button type="submit">Create member</button>
+          </div>
         </form>
       </section>
       {platformOwner && <PlatformGyms organizations={organizations} videos={videos} courses={courses} setError={setError} setNotice={setNotice} />}

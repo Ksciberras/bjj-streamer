@@ -75,7 +75,9 @@ export function PlatformGyms(props: PlatformGymsProps) {
         </div>
         <label>Gym name<input name="name" required maxLength={120} placeholder="e.g. BJJ Cork" /></label>
         <label>URL slug<input name="slug" required pattern="[a-z0-9]+(?:-[a-z0-9]+)*" placeholder="e.g. bjj-cork" /></label>
-        <button>Create gym</button>
+        <div className="admin-form-actions">
+          <button>Create gym</button>
+        </div>
       </form>
       <div className="gym-availability-heading">
         <div>
