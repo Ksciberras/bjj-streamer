@@ -740,6 +740,43 @@ td small { margin-top: .2rem; }
   gap: .5rem;
 }
 
+.platform-gyms {
+  display: grid;
+  gap: .75rem;
+}
+
+.platform-gyms details {
+  padding: .9rem 1rem;
+}
+
+.platform-gyms summary {
+  cursor: pointer;
+  font-weight: 700;
+}
+
+.availability-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1.5rem;
+  padding-top: 1rem;
+}
+
+.availability-grid > div {
+  display: grid;
+  align-content: start;
+  gap: .5rem;
+}
+
+.availability-grid h3 {
+  margin: 0 0 .35rem;
+}
+
+@media (max-width: 700px) {
+  .availability-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
 .saved-video-list article {
   display: grid;
   grid-template-columns: 96px minmax(0, 1fr) auto auto;

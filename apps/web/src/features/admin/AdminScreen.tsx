@@ -1,12 +1,16 @@
 import type { FormEvent } from 'react'
 import { PageHeader, SectionHeading } from '../../components/ui'
 import { api, errorMessage } from '../../lib/api'
-import type { User, Video } from '../../types'
+import type { CourseSummary, Organization, User, Video } from '../../types'
 import { ManageVideos } from '../videos/ManageVideos'
+import { PlatformGyms } from './PlatformGyms'
 
 type AdminScreenProps = {
   users: User[]
   videos: Video[]
+  courses: CourseSummary[]
+  organizations: Organization[]
+  platformOwner: boolean
   onRefreshUsers: () => Promise<void>
   onRefreshVideos: () => Promise<void>
   setError: (value: string) => void
@@ -16,6 +20,9 @@ type AdminScreenProps = {
 export function AdminScreen({
   users,
   videos,
+  courses,
+  organizations,
+  platformOwner,
   onRefreshUsers,
   onRefreshVideos,
   setError,
@@ -33,6 +40,7 @@ export function AdminScreen({
           email: data.get('email'),
           role: data.get('role'),
           password: data.get('password'),
+          organization_id: platformOwner ? data.get('organization_id') : undefined,
         }),
       })
       form.reset()
@@ -89,6 +97,7 @@ export function AdminScreen({
               <option value="admin">Admin</option>
             </select>
           </label>
+          {platformOwner && <label>Gym<select name="organization_id" required><option value="">Choose gym</option>{organizations.map((organization) => <option value={organization.id} key={organization.id}>{organization.name}</option>)}</select></label>}
           <label>
             Temporary password
             <input name="password" type="password" minLength={12} required autoComplete="new-password" />
@@ -96,6 +105,7 @@ export function AdminScreen({
           <button type="submit">Create account</button>
         </form>
       </section>
+      {platformOwner && <PlatformGyms organizations={organizations} videos={videos} courses={courses} setError={setError} setNotice={setNotice} />}
       <section className="section">
         <SectionHeading title="Members" />
         <div className="responsive-table surface">

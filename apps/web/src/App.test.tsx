@@ -79,4 +79,21 @@ describe('App', () => {
     fireEvent.keyDown(window, { key: 'Escape' })
     expect(screen.getAllByRole('textbox')).toHaveLength(1)
   })
+
+  it('shows gym and availability controls only to the platform owner', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockImplementation(async (input: string) => {
+      if (input === '/api/auth/session') return { ok: true, status: 200, json: async () => ({ user: { id: 'owner', email: 'kyranu2@gmail.com', role: 'admin', is_platform_owner: true } }) }
+      if (input === '/api/platform/organizations') return { ok: true, status: 200, json: async () => ({ organizations: [{ id: 'gym', name: 'BJJ Cork', slug: 'bjj-cork' }] }) }
+      if (input === '/api/platform/availability') return { ok: true, status: 200, json: async () => ({ videos: [], courses: [] }) }
+      if (input === '/api/admin/users') return { ok: true, status: 200, json: async () => ({ users: [] }) }
+      if (input === '/api/courses') return { ok: true, status: 200, json: async () => ({ courses: [] }) }
+      if (input === '/api/study') return { ok: true, status: 200, json: async () => ({ watch_later: [], notes: [] }) }
+      return { ok: true, status: 200, json: async () => ({ videos: [] }) }
+    }))
+    render(<App />)
+    fireEvent.click((await screen.findAllByRole('button', { name: 'Admin' }))[0])
+    expect(await screen.findByRole('heading', { name: 'Gyms and availability' })).toBeInTheDocument()
+    expect(screen.getByRole('combobox', { name: 'Gym' })).toBeRequired()
+    expect(screen.getByRole('button', { name: 'Create gym' })).toBeInTheDocument()
+  })
 })

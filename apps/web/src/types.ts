@@ -7,7 +7,11 @@ export type User = {
   role: Role
   disabled?: boolean
   created_at?: string
+  organization_id?: string
+  is_platform_owner?: boolean
 }
+
+export type Organization = { id: string; name: string; slug: string }
 
 export type Video = {
   id: string
@@ -33,6 +37,7 @@ export type CourseSummary = {
   title: string
   instructor_name: string
   video_count: number
+  organization_id?: string
 }
 
 export type CourseVideo = Video & {

@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { AppShell } from '../../components/AppShell'
 import { StatusMessage } from '../../components/ui'
 import { api, errorMessage } from '../../lib/api'
-import type { Course, CourseSummary, CourseVideo, ProgressMap, StudyNote, User, Video, View } from '../../types'
+import type { Course, CourseSummary, CourseVideo, Organization, ProgressMap, StudyNote, User, Video, View } from '../../types'
 import { AdminScreen } from '../admin/AdminScreen'
 import { HomeScreen, LibraryScreen } from '../library/LibraryScreens'
 import { StudyScreen } from '../study/StudyScreen'
@@ -25,6 +25,7 @@ export function Workspace({ user, logout }: WorkspaceProps) {
   const [watchLater, setWatchLater] = useState<Video[]>([])
   const [studyNotes, setStudyNotes] = useState<StudyNote[]>([])
   const [initialSeek, setInitialSeek] = useState<number | undefined>()
+  const [organizations, setOrganizations] = useState<Organization[]>([])
   const [selectedVideo, setSelectedVideo] = useState<Video | null>(null)
   const [loadingVideos, setLoadingVideos] = useState(true)
   const [error, setError] = useState('')
@@ -106,6 +107,11 @@ export function Workspace({ user, logout }: WorkspaceProps) {
       cancelled = true
     }
   }, [user.role])
+
+  useEffect(() => {
+    if (!user.is_platform_owner) return
+    void api('/api/platform/organizations').then((body) => setOrganizations(body.organizations)).catch((reason) => setError(errorMessage(reason, 'Unable to load gyms')))
+  }, [user.is_platform_owner])
 
   function navigate(next: View) {
     setSelectedVideo(null)
@@ -246,6 +252,9 @@ export function Workspace({ user, logout }: WorkspaceProps) {
         <AdminScreen
           users={users}
           videos={videos}
+          courses={courses}
+          organizations={organizations}
+          platformOwner={Boolean(user.is_platform_owner)}
           onRefreshUsers={refreshUsers}
           onRefreshVideos={refreshVideos}
           setError={setError}
