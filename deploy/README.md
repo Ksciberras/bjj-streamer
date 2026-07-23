@@ -70,6 +70,21 @@ curl --fail https://YOUR_DOMAIN/readyz
 
 Migrations run before the API starts. Never edit an applied migration. Review new migrations and take a backup before updating.
 
+## Automatic deployment from GitHub
+
+The `CI` GitHub Actions workflow deploys a push to `main` only after the backend, frontend, and Compose jobs pass. The Droplet must have a dedicated deployment user that can access `/srv/bjj-streaming`, run Docker Compose, and use the repository's read-only GitHub deploy key.
+
+Configure a protected GitHub environment named `production` with these encrypted secrets:
+
+- `DEPLOY_HOST`: the Droplet IP address or hostname.
+- `DEPLOY_USER`: the dedicated Droplet deployment user.
+- `DEPLOY_SSH_KEY`: the private half of a dedicated key used only for GitHub Actions to connect to the Droplet.
+- `DEPLOY_HOST_KEY`: the Droplet's complete trusted `known_hosts` line, collected from a trusted network and verified against the Droplet host key fingerprint.
+
+The deployment job sends the tested commit SHA to `deploy/deploy.sh`. The script fetches that commit, creates a PostgreSQL backup, fast-forwards `main`, validates production Compose configuration, rebuilds the application, and waits for healthy containers. GitHub then checks the public readiness endpoint.
+
+GitHub-hosted runner source addresses change. If SSH is restricted by a DigitalOcean Cloud Firewall, either maintain allow rules for the current GitHub Actions address ranges or use a secure private-network runner approach. Do not broadly expose SSH with password or root login enabled merely to make CI/CD convenient.
+
 ## Backup
 
 Create a database backup:
