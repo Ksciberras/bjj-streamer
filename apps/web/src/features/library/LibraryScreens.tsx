@@ -44,7 +44,7 @@ export function HomeScreen({ videos, progress, loading, openVideo, browse }: { v
   </div>
 }
 
-export function LibraryScreen({ videos, courses = [], progress, loading, initialFilter, openVideo, openCourse, onSearch }: { videos: Video[]; courses?: CourseSummary[]; progress: ProgressMap; loading: boolean; initialFilter: { instructor?: string; tag?: string }; openVideo: OpenVideo; openCourse: (course: CourseSummary) => void; onSearch: (query: string) => Promise<void> }) {
+export function LibraryScreen({ videos, courses = [], progress, loading, initialFilter, openVideo, openCourse, watchLaterIDs = new Set(), onToggleWatchLater = () => undefined, onSearch }: { videos: Video[]; courses?: CourseSummary[]; progress: ProgressMap; loading: boolean; initialFilter: { instructor?: string; tag?: string }; openVideo: OpenVideo; openCourse: (course: CourseSummary) => void; watchLaterIDs?: Set<string>; onToggleWatchLater?: (video: Video) => void; onSearch: (query: string) => Promise<void> }) {
   const [query, setQuery] = useState('')
   const [instructor, setInstructor] = useState(initialFilter.instructor ?? '')
   const [instructional, setInstructional] = useState('')
@@ -140,12 +140,12 @@ export function LibraryScreen({ videos, courses = [], progress, loading, initial
     {loading
       ? <LoadingSkeleton />
       : filtered.length
-        ? <div className="video-grid library-grid">{filtered.map((video) => <VideoCard key={video.id} video={video} savedAt={progress[video.id]} onOpen={() => openVideo(video)} />)}</div>
+        ? <div className="video-grid library-grid">{filtered.map((video) => <VideoCard key={video.id} video={video} savedAt={progress[video.id]} savedForLater={watchLaterIDs.has(video.id)} onToggleWatchLater={() => onToggleWatchLater(video)} onOpen={() => openVideo(video)} />)}</div>
         : <EmptyState title="No videos found" body="Try clearing a filter or using a broader search." action={hasFilters ? <button onClick={clearFilters}>Clear filters</button> : undefined} />}
   </div>
 }
 
-function VideoCard({ video, savedAt = 0, onOpen }: { video: Video; savedAt?: number; onOpen: () => void }) {
+function VideoCard({ video, savedAt = 0, savedForLater = false, onToggleWatchLater, onOpen }: { video: Video; savedAt?: number; savedForLater?: boolean; onToggleWatchLater?: () => void; onOpen: () => void }) {
   return <article className="video-card">
     <button className="video-cover" onClick={onOpen} aria-label={`Study ${video.title}`}>
       <VideoPlaceholder video={video} label="Study video" />
@@ -156,6 +156,7 @@ function VideoCard({ video, savedAt = 0, onOpen }: { video: Video; savedAt?: num
       <p>{video.instructor_name}</p>
       {(video.instructional_name || video.chapter_name) && <small>{[video.instructional_name, video.chapter_name].filter(Boolean).join(' · ')}</small>}
       <button className="card-action" onClick={onOpen}>{savedAt > 0 ? 'Resume' : 'Study video'} <span aria-hidden="true">→</span></button>
+      {onToggleWatchLater && <button className="text-button save-later" onClick={onToggleWatchLater}>{savedForLater ? 'Saved for later' : 'Watch later'}</button>}
     </div>
   </article>
 }

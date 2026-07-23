@@ -1,5 +1,5 @@
 export type Role = 'admin' | 'instructor' | 'student'
-export type View = 'home' | 'library' | 'upload' | 'admin'
+export type View = 'home' | 'library' | 'study' | 'upload' | 'admin'
 
 export type User = {
   id: string
@@ -48,6 +48,13 @@ export type Note = {
   id: string
   timestamp_seconds: number
   body: string
+}
+
+export type StudyNote = Note & {
+  video_id: string
+  video_title: string
+  instructor_name: string
+  video: Video
 }
 
 export type ProgressMap = Record<string, number>

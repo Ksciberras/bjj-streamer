@@ -21,6 +21,7 @@ export function AppShell({ user, active, canUpload, onNavigate, onLogout, childr
   const navigation: NavigationItem[] = [
     { id: 'home', label: 'Home', show: true },
     { id: 'library', label: 'Library', show: true },
+    { id: 'study', label: 'Study', show: true },
     { id: 'upload', label: 'Upload', show: canUpload },
     { id: 'admin', label: 'Admin', show: user.role === 'admin' },
   ]
@@ -42,7 +43,7 @@ export function AppShell({ user, active, canUpload, onNavigate, onLogout, childr
     <main className="content" id="main-content" tabIndex={-1}>{children}</main>
 
     <nav className="mobile-nav" aria-label="Mobile navigation">
-      {primaryNavigation.filter((item) => item.id === 'home' || item.id === 'library').map((item) =>
+      {primaryNavigation.filter((item) => item.id === 'home' || item.id === 'library' || item.id === 'study').map((item) =>
         <NavigationButton key={item.id} item={item} active={active} onNavigate={onNavigate} />,
       )}
     </nav>

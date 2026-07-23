@@ -12,9 +12,12 @@ type StudyScreenProps = {
   course: Course | null
   autoPlay: boolean
   onSelectCourseVideo: (video: CourseVideo, autoPlay?: boolean) => void
+  initialSeek?: number
+  savedForLater: boolean
+  onToggleWatchLater: () => void
 }
 
-export function StudyScreen({ video, course, autoPlay, onSelectCourseVideo, onBack, setError, onProgress }: StudyScreenProps) {
+export function StudyScreen({ video, course, autoPlay, initialSeek, savedForLater, onToggleWatchLater, onSelectCourseVideo, onBack, setError, onProgress }: StudyScreenProps) {
   const player = useRef<HTMLVideoElement>(null)
   const noteInput = useRef<HTMLTextAreaElement>(null)
   const lastSaved = useRef(0)
@@ -36,7 +39,7 @@ export function StudyScreen({ video, course, autoPlay, onSelectCourseVideo, onBa
       api(`/api/videos/${video.id}/notes`),
     ]).then(([playback, progress, noteBody]) => {
       if (cancelled) return
-      const saved = Number(progress.progress.position_seconds) || 0
+      const saved = initialSeek ?? (Number(progress.progress.position_seconds) || 0)
       setURL(playback.playback_url)
       setResumeAt(saved)
       lastSaved.current = saved
@@ -51,7 +54,7 @@ export function StudyScreen({ video, course, autoPlay, onSelectCourseVideo, onBa
       }
     })
     return () => { cancelled = true }
-  }, [video.id, setError])
+  }, [video.id, initialSeek, setError])
 
   useEffect(() => {
     if (!autoPlay || !url || !player.current) return
@@ -193,6 +196,9 @@ export function StudyScreen({ video, course, autoPlay, onSelectCourseVideo, onBa
   return (
     <div className="screen study-screen">
       <button className="back-button" onClick={() => void back()}>← Back to library</button>
+      <button className="secondary-button watch-later-player" type="button" onClick={onToggleWatchLater}>
+        {savedForLater ? 'Remove from Watch later' : 'Save to Watch later'}
+      </button>
       <div className="study-layout">
         <Player
           video={video}

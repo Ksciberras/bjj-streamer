@@ -24,6 +24,13 @@ type Note struct {
 	UpdatedAt        time.Time `json:"updated_at"`
 }
 
+type StudyNote struct {
+	Note
+	VideoID        string `json:"video_id"`
+	VideoTitle     string `json:"video_title"`
+	InstructorName string `json:"instructor_name"`
+}
+
 type Store struct{ db *pgxpool.Pool }
 
 func NewStore(db *pgxpool.Pool) *Store { return &Store{db: db} }
@@ -84,4 +91,50 @@ func (s *Store) DeleteNote(ctx context.Context, userID, videoID, noteID string) 
 		return ErrNotFound
 	}
 	return nil
+}
+
+func (s *Store) ListStudyNotes(ctx context.Context, userID string) ([]StudyNote, error) {
+	rows, err := s.db.Query(ctx, `SELECT n.id,n.timestamp_seconds,n.body,n.created_at,n.updated_at,v.id,v.title,v.instructor_name
+		FROM notes n JOIN videos v ON v.id=n.video_id
+		WHERE n.user_id=$1 ORDER BY n.updated_at DESC,n.id`, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	result := []StudyNote{}
+	for rows.Next() {
+		var note StudyNote
+		if err = rows.Scan(&note.ID, &note.TimestampSeconds, &note.Body, &note.CreatedAt, &note.UpdatedAt, &note.VideoID, &note.VideoTitle, &note.InstructorName); err != nil {
+			return nil, err
+		}
+		result = append(result, note)
+	}
+	return result, rows.Err()
+}
+
+func (s *Store) ListWatchLaterIDs(ctx context.Context, userID string) ([]string, error) {
+	rows, err := s.db.Query(ctx, `SELECT video_id FROM watch_later WHERE user_id=$1 ORDER BY created_at DESC`, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	result := []string{}
+	for rows.Next() {
+		var id string
+		if err = rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		result = append(result, id)
+	}
+	return result, rows.Err()
+}
+
+func (s *Store) AddWatchLater(ctx context.Context, userID, videoID string) error {
+	_, err := s.db.Exec(ctx, `INSERT INTO watch_later(user_id,video_id) VALUES($1,$2) ON CONFLICT DO NOTHING`, userID, videoID)
+	return err
+}
+
+func (s *Store) RemoveWatchLater(ctx context.Context, userID, videoID string) error {
+	_, err := s.db.Exec(ctx, `DELETE FROM watch_later WHERE user_id=$1 AND video_id=$2`, userID, videoID)
+	return err
 }

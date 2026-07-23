@@ -43,7 +43,7 @@ and issued only after the API confirms that the current user can view the
 associated video. Existing videos without thumbnails continue to use the
 standard RollStudy placeholder.
 
-Select **Watch** to request an authorized short-lived playback URL. The native browser player resumes from your saved position, saves periodically and when paused or left, and supports private timestamped notes. Selecting a note seeks the player to that timestamp. Progress and notes are isolated per user. Course playback provides ordered previous/next navigation and attempts to play the next accessible chapter automatically; browsers that block autoplay show an explicit play action.
+Select **Watch** to request an authorized short-lived playback URL. The native browser player resumes from your saved position, saves periodically and when paused or left, and supports private timestamped notes. Selecting a note seeks the player to that timestamp. Progress and notes are isolated per user. The **Study** screen collects each user's Watch Later videos and private notes into timestamped shortcuts. Course playback provides ordered previous/next navigation and attempts to play the next accessible chapter automatically; browsers that block autoplay show an explicit play action.
 
 Stop the application without deleting PostgreSQL data:
 
@@ -101,7 +101,7 @@ extensions, enforce the 5 MiB limit, and verify stored metadata.
 
 Authentication uses Argon2id passwords, random server-side sessions stored only as token hashes, strict SameSite cookies, CSRF tokens for state-changing authenticated requests, and an in-process login limiter. The limiter resets when the API restarts and is suitable only for the single-Droplet MVP.
 
-The database still contains the older invitation, personal/shared library, membership, and append-only audit structures. They are retained for migration and stored-data compatibility. Invitation endpoints are inactive, and library/audit management is no longer part of the primary frontend journey. Applied migrations remain immutable; ordered courses are introduced by migration `000008`.
+The database still contains the older invitation, personal/shared library, membership, and append-only audit structures. They are retained for migration and stored-data compatibility. Invitation endpoints are inactive, and library/audit management is no longer part of the primary frontend journey. Applied migrations remain immutable; ordered courses are introduced by migration `000008` and private Watch Later entries by `000009`.
 
 ## Verification
 

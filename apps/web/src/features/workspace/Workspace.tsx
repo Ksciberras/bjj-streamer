@@ -2,10 +2,11 @@ import { useEffect, useState } from 'react'
 import { AppShell } from '../../components/AppShell'
 import { StatusMessage } from '../../components/ui'
 import { api, errorMessage } from '../../lib/api'
-import type { Course, CourseSummary, CourseVideo, ProgressMap, User, Video, View } from '../../types'
+import type { Course, CourseSummary, CourseVideo, ProgressMap, StudyNote, User, Video, View } from '../../types'
 import { AdminScreen } from '../admin/AdminScreen'
 import { HomeScreen, LibraryScreen } from '../library/LibraryScreens'
 import { StudyScreen } from '../study/StudyScreen'
+import { StudyHub } from '../study/StudyHub'
 import { UploadScreen } from '../upload/UploadScreen'
 
 type WorkspaceProps = {
@@ -21,6 +22,9 @@ export function Workspace({ user, logout }: WorkspaceProps) {
   const [courses, setCourses] = useState<CourseSummary[]>([])
   const [activeCourse, setActiveCourse] = useState<Course | null>(null)
   const [autoplay, setAutoplay] = useState(false)
+  const [watchLater, setWatchLater] = useState<Video[]>([])
+  const [studyNotes, setStudyNotes] = useState<StudyNote[]>([])
+  const [initialSeek, setInitialSeek] = useState<number | undefined>()
   const [selectedVideo, setSelectedVideo] = useState<Video | null>(null)
   const [loadingVideos, setLoadingVideos] = useState(true)
   const [error, setError] = useState('')
@@ -59,13 +63,21 @@ export function Workspace({ user, logout }: WorkspaceProps) {
     setCourses((await api('/api/courses')).courses)
   }
 
+  async function refreshStudy() {
+    const body = await api('/api/study')
+    setWatchLater(body.watch_later ?? [])
+    setStudyNotes(body.notes ?? [])
+  }
+
   useEffect(() => {
     let cancelled = false
-    void Promise.all([api('/api/videos'), api('/api/courses')])
-      .then(([body, courseBody]) => {
+    void Promise.all([api('/api/videos'), api('/api/courses'), api('/api/study')])
+      .then(([body, courseBody, studyBody]) => {
         if (!cancelled) {
           setVideos(body.videos)
           setCourses(courseBody.courses)
+          setWatchLater(studyBody.watch_later ?? [])
+          setStudyNotes(studyBody.notes ?? [])
           void loadProgress(body.videos)
         }
       })
@@ -98,17 +110,30 @@ export function Workspace({ user, logout }: WorkspaceProps) {
   function navigate(next: View) {
     setSelectedVideo(null)
     setActiveCourse(null)
+    setInitialSeek(undefined)
     setView(next)
     setError('')
     window.scrollTo({ top: 0, behavior: 'smooth' })
   }
 
-  function openVideo(video: Video) {
+  function openVideo(video: Video, timestamp?: number) {
     setActiveCourse(null)
     setAutoplay(false)
+    setInitialSeek(timestamp)
     setSelectedVideo(video)
     setError('')
     window.scrollTo({ top: 0 })
+  }
+
+  async function toggleWatchLater(video: Video) {
+    const saved = watchLater.some((item) => item.id === video.id)
+    try {
+      await api(`/api/videos/${video.id}/watch-later`, { method: saved ? 'DELETE' : 'PUT', body: '{}' })
+      await refreshStudy()
+      setNotice(saved ? 'Removed from Watch later.' : 'Saved to Watch later.')
+    } catch (reason) {
+      setError(errorMessage(reason, 'Unable to update Watch later'))
+    }
   }
 
   async function openCourse(summary: CourseSummary) {
@@ -149,6 +174,9 @@ export function Workspace({ user, logout }: WorkspaceProps) {
           video={selectedVideo}
           course={activeCourse}
           autoPlay={autoplay}
+          initialSeek={initialSeek}
+          savedForLater={watchLater.some((item) => item.id === selectedVideo.id)}
+          onToggleWatchLater={() => void toggleWatchLater(selectedVideo)}
           onSelectCourseVideo={selectCourseVideo}
           onBack={() => {
             setSelectedVideo(null)
@@ -172,6 +200,8 @@ export function Workspace({ user, logout }: WorkspaceProps) {
           loading={loadingVideos}
           initialFilter={librarySeed}
           openVideo={openVideo}
+          watchLaterIDs={new Set(watchLater.map((video) => video.id))}
+          onToggleWatchLater={(video) => void toggleWatchLater(video)}
           openCourse={(course) => void openCourse(course)}
           onSearch={async (query) => {
             setLoadingVideos(true)
@@ -187,13 +217,22 @@ export function Workspace({ user, logout }: WorkspaceProps) {
       )
     }
 
+    if (view === 'study') {
+      return <StudyHub
+        watchLater={watchLater}
+        notes={studyNotes}
+        onOpenVideo={openVideo}
+        onRemoveWatchLater={(video) => void toggleWatchLater(video)}
+      />
+    }
+
     if (view === 'upload' && canUpload) {
       return (
         <UploadScreen
           user={user}
           videos={videos}
           onUploaded={async () => {
-            await Promise.all([refreshVideos(), refreshCourses()])
+            await Promise.all([refreshVideos(), refreshCourses(), refreshStudy()])
             setNotice('Upload complete. The video is ready to study.')
           }}
           onError={setError}

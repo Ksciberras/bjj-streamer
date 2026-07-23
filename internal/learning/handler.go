@@ -37,6 +37,75 @@ func (h *Handler) Register(mux *http.ServeMux) {
 	mux.HandleFunc("POST /api/videos/{id}/notes", h.createNote)
 	mux.HandleFunc("PATCH /api/videos/{id}/notes/{note_id}", h.updateNote)
 	mux.HandleFunc("DELETE /api/videos/{id}/notes/{note_id}", h.deleteNote)
+	mux.HandleFunc("GET /api/study", h.study)
+	mux.HandleFunc("PUT /api/videos/{id}/watch-later", h.addWatchLater)
+	mux.HandleFunc("DELETE /api/videos/{id}/watch-later", h.removeWatchLater)
+}
+
+func (h *Handler) study(w http.ResponseWriter, r *http.Request) {
+	_, session, ok := h.auth.Authenticate(w, r)
+	if !ok {
+		return
+	}
+	ids, err := h.store.ListWatchLaterIDs(r.Context(), session.User.ID)
+	if err != nil {
+		serverError(w)
+		return
+	}
+	watchLater := []videos.Video{}
+	for _, id := range ids {
+		video, getErr := h.videos.Get(r.Context(), id)
+		if getErr == nil && h.policy.ViewVideo(authorization.Actor{ID: session.User.ID, Role: authorization.Role(session.User.Role)}, authorization.Video{UploaderID: video.UploadedByUserID, Visibility: authorization.Visibility(video.Visibility), Ready: video.Status == "ready"}) {
+			if video.ThumbnailReady && video.ThumbnailObjectKey != nil {
+				video.ThumbnailURL = "/api/videos/" + video.ID + "/thumbnail"
+			}
+			watchLater = append(watchLater, video)
+		}
+	}
+	notes, err := h.store.ListStudyNotes(r.Context(), session.User.ID)
+	if err != nil {
+		serverError(w)
+		return
+	}
+	type studyNoteResponse struct {
+		StudyNote
+		Video videos.Video `json:"video"`
+	}
+	visibleNotes := []studyNoteResponse{}
+	for _, note := range notes {
+		video, getErr := h.videos.Get(r.Context(), note.VideoID)
+		if getErr == nil && h.policy.ViewVideo(authorization.Actor{ID: session.User.ID, Role: authorization.Role(session.User.Role)}, authorization.Video{UploaderID: video.UploadedByUserID, Visibility: authorization.Visibility(video.Visibility), Ready: video.Status == "ready"}) {
+			if video.ThumbnailReady && video.ThumbnailObjectKey != nil {
+				video.ThumbnailURL = "/api/videos/" + video.ID + "/thumbnail"
+			}
+			visibleNotes = append(visibleNotes, studyNoteResponse{StudyNote: note, Video: video})
+		}
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"watch_later": watchLater, "notes": visibleNotes})
+}
+
+func (h *Handler) addWatchLater(w http.ResponseWriter, r *http.Request) {
+	session, video, ok := h.authorized(w, r, true)
+	if !ok {
+		return
+	}
+	if err := h.store.AddWatchLater(r.Context(), session.User.ID, video.ID); err != nil {
+		serverError(w)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
+func (h *Handler) removeWatchLater(w http.ResponseWriter, r *http.Request) {
+	session, video, ok := h.authorized(w, r, true)
+	if !ok {
+		return
+	}
+	if err := h.store.RemoveWatchLater(r.Context(), session.User.ID, video.ID); err != nil {
+		serverError(w)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
 }
 
 func (h *Handler) authorized(w http.ResponseWriter, r *http.Request, csrf bool) (auth.Session, videos.Video, bool) {

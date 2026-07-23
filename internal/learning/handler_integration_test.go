@@ -142,4 +142,15 @@ func TestPlaybackAuthorizationAndLearningIsolation(t *testing.T) {
 	if response := learningResponse(mux, learningRequest(t, http.MethodDelete, "/api/videos/"+sharedID+"/notes/"+payload.Note.ID, nil, second)); response.Code != http.StatusNotFound {
 		t.Fatalf("other delete=%d", response.Code)
 	}
+	if response := learningResponse(mux, learningRequest(t, http.MethodPut, "/api/videos/"+sharedID+"/watch-later", nil, first)); response.Code != http.StatusNoContent {
+		t.Fatalf("watch later=%d %s", response.Code, response.Body.String())
+	}
+	firstStudy := learningResponse(mux, learningRequest(t, http.MethodGet, "/api/study", nil, first))
+	if firstStudy.Code != http.StatusOK || !bytes.Contains(firstStudy.Body.Bytes(), []byte("First user's note")) || !bytes.Contains(firstStudy.Body.Bytes(), []byte(sharedID)) {
+		t.Fatalf("first study=%d %s", firstStudy.Code, firstStudy.Body.String())
+	}
+	secondStudy := learningResponse(mux, learningRequest(t, http.MethodGet, "/api/study", nil, second))
+	if secondStudy.Code != http.StatusOK || bytes.Contains(secondStudy.Body.Bytes(), []byte("First user's note")) || bytes.Contains(secondStudy.Body.Bytes(), []byte(sharedID)) {
+		t.Fatalf("study data leaked=%d %s", secondStudy.Code, secondStudy.Body.String())
+	}
 }
