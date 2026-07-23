@@ -96,6 +96,11 @@ tables yet. Plain metadata and tags are enough to validate the product.
 Video bytes must not pass through the Go API. Students cannot call upload
 endpoints. Spaces credentials must never reach the frontend.
 
+Admins may batch-select course MP4s in the frontend. A batch reuses shared
+metadata and runs at most two independent single-file upload workflows at once.
+It does not change the one-presigned-PUT-per-video rule and is not multipart or
+resumable upload.
+
 ### Playback and study
 
 - API checks access and returns a short-lived presigned GET URL.

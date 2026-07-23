@@ -25,6 +25,10 @@ describe('App', () => {
 	render(<App />)
 	expect(await screen.findByText('admin@example.com')).toBeInTheDocument()
 	expect(screen.getAllByRole('button', { name: 'Upload' })).toHaveLength(2)
+	fireEvent.click(screen.getAllByRole('button', { name: 'Upload' })[0])
+	expect(screen.getByRole('button', { name: 'Course batch' })).toBeInTheDocument()
+	fireEvent.click(screen.getByRole('button', { name: 'Course batch' }))
+	expect(screen.getByLabelText(/^Course MP4 files/)).toHaveAttribute('multiple')
 	fireEvent.click(screen.getAllByRole('button', { name: 'Admin' })[0])
 	expect(screen.getByRole('heading', { name: 'Create account' })).toBeInTheDocument()
   })
@@ -38,6 +42,8 @@ describe('App', () => {
     expect(await screen.findByRole('heading', { name: 'Home' })).toBeInTheDocument()
     expect(screen.getAllByRole('button', { name: 'Upload' })).toHaveLength(2)
     expect(screen.queryByRole('button', { name: 'Admin' })).not.toBeInTheDocument()
+    fireEvent.click(screen.getAllByRole('button', { name: 'Upload' })[0])
+    expect(screen.queryByRole('button', { name: 'Course batch' })).not.toBeInTheDocument()
   })
 
   it('keeps upload controls away from students', async () => {

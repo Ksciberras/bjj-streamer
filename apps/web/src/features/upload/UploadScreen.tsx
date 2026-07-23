@@ -1,11 +1,12 @@
 import { useState, type FormEvent } from 'react'
 import { PageHeader } from '../../components/ui'
-import { api, errorMessage } from '../../lib/api'
+import { errorMessage } from '../../lib/api'
 import { formatBytes } from '../../lib/format'
-import { uploadToStorage } from '../../lib/objectUpload'
 import { generateVideoThumbnail } from '../../lib/videoThumbnail'
+import { uploadVideo, type VideoMetadata } from '../../lib/videoUpload'
 import type { User, Video } from '../../types'
 import { ManageVideos } from '../videos/ManageVideos'
+import { BatchUploadForm } from './BatchUploadForm'
 
 type UploadScreenProps = {
   user: User
@@ -26,6 +27,7 @@ export function UploadScreen({
   const [thumbnail, setThumbnail] = useState<File | null>(null)
   const [progress, setProgress] = useState<number | null>(null)
   const [state, setState] = useState<'idle' | 'preparing' | 'uploading' | 'success' | 'error'>('idle')
+  const [mode, setMode] = useState<'single' | 'batch'>('single')
 
   async function upload(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -46,9 +48,11 @@ export function UploadScreen({
       const selectedThumbnail = thumbnail
         ?? await generateVideoThumbnail(chosen).catch(() => null)
       setState('uploading')
-      const body = await api('/api/videos/upload-requests', {
-        method: 'POST',
-        body: JSON.stringify({
+      const result = await uploadVideo({
+        file: chosen,
+        thumbnail: selectedThumbnail,
+        onProgress: setProgress,
+        metadata: {
           title: data.get('title'),
           instructor_name: data.get('instructor_name'),
           instructional_name: data.get('instructional_name') || null,
@@ -60,44 +64,17 @@ export function UploadScreen({
             .filter(Boolean),
           visibility: data.get('visibility'),
           content_basis: data.get('content_basis'),
-          filename: chosen.name,
-          mime_type: chosen.type,
-          byte_size: chosen.size,
-        }),
+        } as VideoMetadata,
       })
-
-      await uploadToStorage(body.upload_url, chosen, setProgress)
-      await api(`/api/videos/${body.video.id}/complete`, { method: 'POST', body: '{}' })
-      let thumbnailWarning = ''
-      if (selectedThumbnail) {
-        try {
-          const thumbnailUpload = await api(
-            `/api/videos/${body.video.id}/thumbnail-upload-request`,
-            {
-              method: 'POST',
-              body: JSON.stringify({
-                filename: selectedThumbnail.name,
-                mime_type: selectedThumbnail.type,
-                byte_size: selectedThumbnail.size,
-              }),
-            },
-          )
-          await uploadToStorage(thumbnailUpload.upload_url, selectedThumbnail, () => undefined)
-          await api(`/api/videos/${body.video.id}/thumbnail-complete`, {
-            method: 'POST',
-            body: '{}',
-          })
-        } catch {
-          thumbnailWarning = 'The video uploaded successfully, but its thumbnail could not be saved.'
-        }
-      }
       form.reset()
       setFile(null)
       setThumbnail(null)
       setProgress(100)
       setState('success')
       await onUploaded()
-      if (thumbnailWarning) onError(thumbnailWarning)
+      if (selectedThumbnail && !result.thumbnailSaved) {
+        onError('The video uploaded successfully, but its thumbnail could not be saved.')
+      }
     } catch (reason) {
       setState('error')
       onError(errorMessage(reason, 'Unable to upload video'))
@@ -110,10 +87,23 @@ export function UploadScreen({
 
   return (
     <div className="screen">
-      <PageHeader title="Upload MP4" description="Add one browser-compatible MP4 to the library." />
+      <PageHeader
+        title="Upload MP4"
+        description={mode === 'batch'
+          ? 'Add a complete instructional course with shared metadata.'
+          : 'Add one browser-compatible MP4 to the library.'}
+      />
       <div className="upload-layout">
         <section className="surface upload-panel">
-          <form className="upload-form" onSubmit={upload}>
+          {user.role === 'admin' && (
+            <div className="upload-mode" role="group" aria-label="Upload mode">
+              <button type="button" className={mode === 'single' ? 'active' : ''} onClick={() => setMode('single')}>Single video</button>
+              <button type="button" className={mode === 'batch' ? 'active' : ''} onClick={() => setMode('batch')}>Course batch</button>
+            </div>
+          )}
+          {mode === 'batch' && user.role === 'admin'
+            ? <BatchUploadForm onComplete={onUploaded} onError={onError} />
+            : <form className="upload-form" onSubmit={upload}>
             <div className="form-step">
               <span>1</span>
               <label>
@@ -201,7 +191,7 @@ export function UploadScreen({
               )}
               {state === 'success' && <p className="success-text" role="status">Upload complete. The video is ready.</p>}
             </div>
-          </form>
+            </form>}
         </section>
         <ManageVideos videos={manageable} onUpdate={onUpdate} onError={onError} />
       </div>
