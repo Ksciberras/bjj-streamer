@@ -36,6 +36,7 @@ describe('App', () => {
   it('shows upload but not administration to an instructor', async () => {
     vi.stubGlobal('fetch', vi.fn().mockImplementation(async (input: string) => {
       if (input === '/api/auth/session') return { ok: true, status: 200, json: async () => ({ user: { id: 'i', email: 'instructor@example.com', role: 'instructor' } }) }
+      if (input.startsWith('/api/analytics')) return { ok: true, status: 200, json: async () => ({ analytics: { days: 30, overview: { active_learners: 2, videos_started: 3, resumes: 1, notes_created: 4 }, content: [], members: [] } }) }
       return { ok: true, status: 200, json: async () => ({ videos: [] }) }
     }))
     render(<App />)
@@ -45,6 +46,9 @@ describe('App', () => {
     fireEvent.click(screen.getAllByRole('button', { name: 'Upload' })[0])
     expect(screen.queryByRole('button', { name: 'Course batch' })).not.toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Build from library' })).toBeInTheDocument()
+    fireEvent.click(screen.getAllByRole('button', { name: 'Analytics' })[0])
+    expect(await screen.findByRole('heading', { name: 'Analytics' })).toBeInTheDocument()
+    expect(screen.getByText('Active learners')).toBeInTheDocument()
   })
 
   it('keeps upload controls away from students', async () => {
@@ -55,6 +59,7 @@ describe('App', () => {
     render(<App />)
     expect(await screen.findByRole('heading', { name: 'Home' })).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Upload' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Analytics' })).not.toBeInTheDocument()
     fireEvent.click(screen.getAllByRole('button', { name: 'Library' })[0])
     expect(screen.getByRole('combobox', { name: 'Sort' })).toHaveValue('recent')
   })

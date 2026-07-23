@@ -40,6 +40,51 @@ func (h *Handler) Register(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/study", h.study)
 	mux.HandleFunc("PUT /api/videos/{id}/watch-later", h.addWatchLater)
 	mux.HandleFunc("DELETE /api/videos/{id}/watch-later", h.removeWatchLater)
+	mux.HandleFunc("POST /api/videos/{id}/learning-events", h.recordEvent)
+	mux.HandleFunc("GET /api/analytics", h.analytics)
+}
+
+func (h *Handler) recordEvent(w http.ResponseWriter, r *http.Request) {
+	session, video, ok := h.authorized(w, r, true)
+	if !ok {
+		return
+	}
+	var input struct {
+		Type            string  `json:"type"`
+		PositionSeconds float64 `json:"position_seconds"`
+	}
+	if decode(r, &input) != nil ||
+		(input.Type != "started" && input.Type != "resumed" && input.Type != "completed") ||
+		invalidSeconds(input.PositionSeconds) {
+		badRequest(w)
+		return
+	}
+	if err := h.store.RecordEvent(r.Context(), session.User.ID, video.ID, input.Type, input.PositionSeconds); err != nil {
+		serverError(w)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
+func (h *Handler) analytics(w http.ResponseWriter, r *http.Request) {
+	_, session, ok := h.auth.Authenticate(w, r)
+	if !ok {
+		return
+	}
+	if session.User.Role != "admin" && session.User.Role != "instructor" {
+		notFound(w)
+		return
+	}
+	days := 30
+	if r.URL.Query().Get("period") == "7" {
+		days = 7
+	}
+	result, err := h.store.Analytics(r.Context(), session.User.OrganizationID, session.User.IsPlatformOwner, days)
+	if err != nil {
+		serverError(w)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"analytics": result})
 }
 
 func (h *Handler) study(w http.ResponseWriter, r *http.Request) {

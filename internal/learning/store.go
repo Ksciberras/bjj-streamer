@@ -31,9 +31,112 @@ type StudyNote struct {
 	InstructorName string `json:"instructor_name"`
 }
 
+type AnalyticsOverview struct {
+	ActiveLearners int `json:"active_learners"`
+	VideosStarted  int `json:"videos_started"`
+	Resumes        int `json:"resumes"`
+	NotesCreated   int `json:"notes_created"`
+}
+
+type ContentAnalytics struct {
+	VideoID     string `json:"video_id"`
+	Title       string `json:"title"`
+	Instructor  string `json:"instructor_name"`
+	Viewers     int    `json:"unique_viewers"`
+	Starts      int    `json:"starts"`
+	Resumes     int    `json:"resumes"`
+	Completions int    `json:"completions"`
+	Notes       int    `json:"notes"`
+}
+
+type MemberAnalytics struct {
+	UserID        string     `json:"user_id"`
+	Email         string     `json:"email"`
+	LastActiveAt  *time.Time `json:"last_active_at"`
+	VideosStarted int        `json:"videos_started"`
+	Notes         int        `json:"notes"`
+}
+
+type AnalyticsResult struct {
+	Days     int                `json:"days"`
+	Overview AnalyticsOverview  `json:"overview"`
+	Content  []ContentAnalytics `json:"content"`
+	Members  []MemberAnalytics  `json:"members"`
+}
+
 type Store struct{ db *pgxpool.Pool }
 
 func NewStore(db *pgxpool.Pool) *Store { return &Store{db: db} }
+
+func (s *Store) RecordEvent(ctx context.Context, userID, videoID, eventType string, position float64) error {
+	_, err := s.db.Exec(ctx, `INSERT INTO learning_events(organization_id,user_id,video_id,event_type,position_seconds)
+		SELECT COALESCE(u.organization_id,v.organization_id),u.id,v.id,$3,$4
+		FROM users u CROSS JOIN videos v WHERE u.id=$1 AND v.id=$2
+		ON CONFLICT(user_id,video_id,event_type,occurred_on)
+		DO UPDATE SET position_seconds=GREATEST(learning_events.position_seconds,EXCLUDED.position_seconds),occurred_at=CURRENT_TIMESTAMP`,
+		userID, videoID, eventType, position)
+	return err
+}
+
+func (s *Store) Analytics(ctx context.Context, organizationID *string, platformOwner bool, days int) (AnalyticsResult, error) {
+	result := AnalyticsResult{Days: days, Content: []ContentAnalytics{}, Members: []MemberAnalytics{}}
+	since := time.Now().AddDate(0, 0, -days)
+	err := s.db.QueryRow(ctx, `SELECT
+		COUNT(DISTINCT le.user_id),
+		COUNT(DISTINCT (le.user_id,le.video_id)) FILTER (WHERE le.event_type IN ('started','resumed')),
+		COUNT(*) FILTER (WHERE le.event_type='resumed'),
+		(SELECT COUNT(*) FROM notes n JOIN users nu ON nu.id=n.user_id WHERE n.created_at >= $3 AND ($2 OR nu.organization_id=$1))
+		FROM learning_events le
+		WHERE le.occurred_at >= $3 AND ($2 OR le.organization_id=$1)`,
+		organizationID, platformOwner, since).Scan(
+		&result.Overview.ActiveLearners, &result.Overview.VideosStarted,
+		&result.Overview.Resumes, &result.Overview.NotesCreated)
+	if err != nil {
+		return AnalyticsResult{}, err
+	}
+	rows, err := s.db.Query(ctx, `SELECT v.id,v.title,v.instructor_name,
+		COUNT(DISTINCT le.user_id),
+		COUNT(*) FILTER (WHERE le.event_type='started'),
+		COUNT(*) FILTER (WHERE le.event_type='resumed'),
+		COUNT(*) FILTER (WHERE le.event_type='completed'),
+		(SELECT COUNT(*) FROM notes n JOIN users nu ON nu.id=n.user_id WHERE n.video_id=v.id AND n.created_at >= $3 AND ($2 OR nu.organization_id=$1))
+		FROM videos v
+		LEFT JOIN learning_events le ON le.video_id=v.id AND le.occurred_at >= $3 AND ($2 OR le.organization_id=$1)
+		WHERE v.status='ready' AND ($2 OR EXISTS(SELECT 1 FROM video_organizations vo WHERE vo.video_id=v.id AND vo.organization_id=$1))
+		GROUP BY v.id ORDER BY COUNT(DISTINCT le.user_id) DESC,v.title LIMIT 50`,
+		organizationID, platformOwner, since)
+	if err != nil {
+		return AnalyticsResult{}, err
+	}
+	for rows.Next() {
+		var item ContentAnalytics
+		if err = rows.Scan(&item.VideoID, &item.Title, &item.Instructor, &item.Viewers, &item.Starts, &item.Resumes, &item.Completions, &item.Notes); err != nil {
+			rows.Close()
+			return AnalyticsResult{}, err
+		}
+		result.Content = append(result.Content, item)
+	}
+	rows.Close()
+	rows, err = s.db.Query(ctx, `SELECT u.id,u.email,MAX(le.occurred_at),
+		COUNT(DISTINCT le.video_id) FILTER (WHERE le.event_type IN ('started','resumed')),
+		(SELECT COUNT(*) FROM notes n WHERE n.user_id=u.id AND n.created_at >= $3)
+		FROM users u LEFT JOIN learning_events le ON le.user_id=u.id AND le.occurred_at >= $3
+		WHERE u.disabled_at IS NULL AND NOT u.is_platform_owner AND ($2 OR u.organization_id=$1)
+		GROUP BY u.id ORDER BY MAX(le.occurred_at) DESC NULLS LAST,u.email`,
+		organizationID, platformOwner, since)
+	if err != nil {
+		return AnalyticsResult{}, err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var item MemberAnalytics
+		if err = rows.Scan(&item.UserID, &item.Email, &item.LastActiveAt, &item.VideosStarted, &item.Notes); err != nil {
+			return AnalyticsResult{}, err
+		}
+		result.Members = append(result.Members, item)
+	}
+	return result, rows.Err()
+}
 
 func (s *Store) GetProgress(ctx context.Context, userID, videoID string) (Progress, error) {
 	var value Progress

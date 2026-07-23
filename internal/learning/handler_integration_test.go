@@ -45,7 +45,7 @@ func learningPool(t *testing.T) *pgxpool.Pool {
 		_, _ = connection.Exec(context.Background(), `SELECT pg_advisory_unlock(8675309)`)
 		connection.Release()
 	})
-	if _, err = pool.Exec(context.Background(), `TRUNCATE notes,playback_progress,videos,audit_events,library_members,libraries,sessions,invitations,users CASCADE`); err != nil {
+	if _, err = pool.Exec(context.Background(), `TRUNCATE learning_events,notes,playback_progress,videos,audit_events,library_members,libraries,sessions,invitations,users CASCADE`); err != nil {
 		t.Fatal(err)
 	}
 	return pool
@@ -152,5 +152,15 @@ func TestPlaybackAuthorizationAndLearningIsolation(t *testing.T) {
 	secondStudy := learningResponse(mux, learningRequest(t, http.MethodGet, "/api/study", nil, second))
 	if secondStudy.Code != http.StatusOK || bytes.Contains(secondStudy.Body.Bytes(), []byte("First user's note")) || bytes.Contains(secondStudy.Body.Bytes(), []byte(sharedID)) {
 		t.Fatalf("study data leaked=%d %s", secondStudy.Code, secondStudy.Body.String())
+	}
+	if response := learningResponse(mux, learningRequest(t, http.MethodPost, "/api/videos/"+sharedID+"/learning-events", map[string]any{"type": "started", "position_seconds": 0}, first)); response.Code != http.StatusNoContent {
+		t.Fatalf("learning event=%d %s", response.Code, response.Body.String())
+	}
+	if response := learningResponse(mux, learningRequest(t, http.MethodGet, "/api/analytics?period=30", nil, first)); response.Code != http.StatusNotFound {
+		t.Fatalf("student analytics=%d", response.Code)
+	}
+	analytics := learningResponse(mux, learningRequest(t, http.MethodGet, "/api/analytics?period=30", nil, instructor))
+	if analytics.Code != http.StatusOK || !bytes.Contains(analytics.Body.Bytes(), []byte(`"active_learners":1`)) || bytes.Contains(analytics.Body.Bytes(), []byte("First user's note")) {
+		t.Fatalf("analytics=%d %s", analytics.Code, analytics.Body.String())
 	}
 }

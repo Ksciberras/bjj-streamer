@@ -23,6 +23,7 @@ export function AppShell({ user, active, canUpload, onNavigate, onLogout, childr
     { id: 'library', label: 'Library', show: true },
     { id: 'study', label: 'Study', show: true },
     { id: 'upload', label: 'Upload', show: canUpload },
+    { id: 'analytics', label: 'Analytics', show: canUpload },
     { id: 'admin', label: 'Admin', show: user.role === 'admin' },
   ]
   const primaryNavigation = navigation.filter((item) => item.show)
@@ -85,6 +86,7 @@ function MobileAccount({ user, canUpload, onNavigate, onLogout }: { user: User; 
     <summary aria-label="Open account menu"><AccountAvatar user={user} /></summary>
     <div>
       {canUpload && <button onClick={() => onNavigate('upload')}>Upload</button>}
+      {canUpload && <button onClick={() => onNavigate('analytics')}>Analytics</button>}
       {user.role === 'admin' && <button onClick={() => onNavigate('admin')}>Admin</button>}
       <button onClick={() => void onLogout()}>Sign out</button>
     </div>

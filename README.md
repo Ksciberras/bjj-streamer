@@ -55,6 +55,13 @@ standard RollStudy placeholder.
 
 Select **Watch** to request an authorized short-lived playback URL. The native browser player resumes from your saved position, saves periodically and when paused or left, and supports private timestamped notes. Selecting a note seeks the player to that timestamp. Progress and notes are isolated per user. The **Study** screen collects each user's Watch Later videos and private notes into timestamped shortcuts. Course playback provides ordered previous/next navigation and attempts to play the next accessible chapter automatically; browsers that block autoplay show an explicit play action.
 
+Administrators and instructors can open **Analytics** to review gym-scoped
+7-day or 30-day study activity, including active learners, videos studied,
+resumes, completions, and note totals. RollStudy records only one start, resume,
+and completion event per user/video/day. Private note text is never included.
+Students cannot access analytics, and normal staff cannot view another gym's
+activity.
+
 Stop the application without deleting PostgreSQL data:
 
 ```bash
@@ -111,7 +118,7 @@ extensions, enforce the 5 MiB limit, and verify stored metadata.
 
 Authentication uses Argon2id passwords, random server-side sessions stored only as token hashes, strict SameSite cookies, CSRF tokens for state-changing authenticated requests, and an in-process login limiter. The limiter resets when the API restarts and is suitable only for the single-Droplet MVP.
 
-The database still contains the older invitation, personal/shared library, membership, and append-only audit structures. They are retained for migration and stored-data compatibility. Invitation and legacy library endpoints are inactive, and library/audit management is no longer part of the primary frontend journey. Applied migrations remain immutable; ordered courses are introduced by migration `000008`, private Watch Later entries by `000009`, and gym isolation by `000010`.
+The database still contains the older invitation, personal/shared library, membership, and append-only audit structures. They are retained for migration and stored-data compatibility. Invitation and legacy library endpoints are inactive, and library/audit management is no longer part of the primary frontend journey. Applied migrations remain immutable; ordered courses are introduced by migration `000008`, private Watch Later entries by `000009`, gym isolation by `000010`, and minimal learning analytics by `000011`.
 
 Migration `000010` deliberately stops if `kyranu2@gmail.com` or
 `info@bjjcork.com` is missing. It promotes the first account to platform owner,

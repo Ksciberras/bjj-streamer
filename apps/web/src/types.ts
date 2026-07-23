@@ -1,5 +1,5 @@
 export type Role = 'admin' | 'instructor' | 'student'
-export type View = 'home' | 'library' | 'study' | 'upload' | 'admin'
+export type View = 'home' | 'library' | 'study' | 'upload' | 'analytics' | 'admin'
 
 export type User = {
   id: string
@@ -64,3 +64,30 @@ export type StudyNote = Note & {
 }
 
 export type ProgressMap = Record<string, number>
+
+export type Analytics = {
+  days: number
+  overview: {
+    active_learners: number
+    videos_started: number
+    resumes: number
+    notes_created: number
+  }
+  content: Array<{
+    video_id: string
+    title: string
+    instructor_name: string
+    unique_viewers: number
+    starts: number
+    resumes: number
+    completions: number
+    notes: number
+  }>
+  members: Array<{
+    user_id: string
+    email: string
+    last_active_at?: string
+    videos_started: number
+    notes: number
+  }>
+}

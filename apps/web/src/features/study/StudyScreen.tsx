@@ -47,6 +47,10 @@ export function StudyScreen({ video, course, autoPlay, initialSeek, savedForLate
       setNotes(noteBody.notes)
       setLoading(false)
       setAutoplayBlocked(false)
+      void api(`/api/videos/${video.id}/learning-events`, {
+        method: 'POST',
+        body: JSON.stringify({ type: saved > 0 ? 'resumed' : 'started', position_seconds: saved }),
+      }).catch(() => undefined)
     }).catch((reason) => {
       if (!cancelled) {
         setError(errorMessage(reason, 'Unable to load video'))
@@ -131,6 +135,10 @@ export function StudyScreen({ video, course, autoPlay, initialSeek, savedForLate
 
   async function advance() {
     await saveProgress().catch(() => undefined)
+    await api(`/api/videos/${video.id}/learning-events`, {
+      method: 'POST',
+      body: JSON.stringify({ type: 'completed', position_seconds: player.current?.duration || player.current?.currentTime || 0 }),
+    }).catch(() => undefined)
     if (nextVideo) onSelectCourseVideo(nextVideo, true)
   }
 

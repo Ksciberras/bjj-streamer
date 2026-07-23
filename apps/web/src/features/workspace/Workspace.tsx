@@ -4,6 +4,7 @@ import { StatusMessage } from '../../components/ui'
 import { api, errorMessage } from '../../lib/api'
 import type { Course, CourseSummary, CourseVideo, Organization, ProgressMap, StudyNote, User, Video, View } from '../../types'
 import { AdminScreen } from '../admin/AdminScreen'
+import { AnalyticsScreen } from '../analytics/AnalyticsScreen'
 import { HomeScreen, LibraryScreen } from '../library/LibraryScreens'
 import { StudyScreen } from '../study/StudyScreen'
 import { StudyHub } from '../study/StudyHub'
@@ -246,6 +247,10 @@ export function Workspace({ user, logout }: WorkspaceProps) {
           onUpdate={refreshVideos}
         />
       )
+    }
+
+    if (view === 'analytics' && canUpload) {
+      return <AnalyticsScreen setError={setError} />
     }
 
     if (view === 'admin' && user.role === 'admin') {
