@@ -31,6 +31,8 @@ export type Video = {
   created_at?: string
 }
 
+export type PopularVideo = Video & { study_count: number }
+
 export type CourseSummary = {
   id: string
   created_by_user_id: string

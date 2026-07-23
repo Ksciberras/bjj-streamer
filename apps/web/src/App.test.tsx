@@ -66,6 +66,20 @@ describe('App', () => {
     expect(screen.getByRole('combobox', { name: 'Sort' })).toHaveValue('recent')
   })
 
+  it('shows popular videos from the member gym on Home', async () => {
+    const video = { id: 'popular', uploaded_by_user_id: 'i', title: 'Guard retention', instructor_name: 'Coach', description: '', tags: [], visibility: 'shared', content_basis: 'self_created', original_filename: 'guard.mp4', byte_size: 10, status: 'ready' }
+    vi.stubGlobal('fetch', vi.fn().mockImplementation(async (input: string) => {
+      if (input === '/api/auth/session') return { ok: true, status: 200, json: async () => ({ user: { id: 's', email: 'student@example.com', role: 'student' } }) }
+      if (input === '/api/videos') return { ok: true, status: 200, json: async () => ({ videos: [video] }) }
+      if (input === '/api/popular') return { ok: true, status: 200, json: async () => ({ videos: [{ ...video, study_count: 3 }] }) }
+      if (input.endsWith('/progress')) return { ok: true, status: 200, json: async () => ({ progress: { position_seconds: 0 } }) }
+      return { ok: true, status: 200, json: async () => ({}) }
+    }))
+    render(<App />)
+    expect(await screen.findByRole('heading', { name: 'Popular in your gym' })).toBeInTheDocument()
+    expect(screen.getByText('3 learners')).toBeInTheDocument()
+  })
+
   it('opens the native player and seeks to a private note', async () => {
     vi.spyOn(HTMLMediaElement.prototype, 'play').mockResolvedValue()
     vi.stubGlobal('fetch', vi.fn().mockImplementation(async (input: string) => {

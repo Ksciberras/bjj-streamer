@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { AppShell } from '../../components/AppShell'
 import { StatusMessage } from '../../components/ui'
 import { api, errorMessage } from '../../lib/api'
-import type { Course, CourseSummary, CourseVideo, Organization, ProgressMap, StudyNote, User, Video, View } from '../../types'
+import type { Course, CourseSummary, CourseVideo, Organization, PopularVideo, ProgressMap, StudyNote, User, Video, View } from '../../types'
 import { AdminScreen } from '../admin/AdminScreen'
 import { AnalyticsScreen } from '../analytics/AnalyticsScreen'
 import { HomeScreen, LibraryScreen } from '../library/LibraryScreens'
@@ -20,6 +20,7 @@ export function Workspace({ user, logout }: WorkspaceProps) {
   const [users, setUsers] = useState<User[]>([])
   const [videos, setVideos] = useState<Video[]>([])
   const [progress, setProgress] = useState<ProgressMap>({})
+  const [popularVideos, setPopularVideos] = useState<PopularVideo[]>([])
   const [courses, setCourses] = useState<CourseSummary[]>([])
   const [activeCourse, setActiveCourse] = useState<Course | null>(null)
   const [autoplay, setAutoplay] = useState(false)
@@ -71,15 +72,20 @@ export function Workspace({ user, logout }: WorkspaceProps) {
     setStudyNotes(body.notes ?? [])
   }
 
+  async function refreshPopular() {
+    setPopularVideos((await api('/api/popular')).videos ?? [])
+  }
+
   useEffect(() => {
     let cancelled = false
-    void Promise.all([api('/api/videos'), api('/api/courses'), api('/api/study')])
-      .then(([body, courseBody, studyBody]) => {
+    void Promise.all([api('/api/videos'), api('/api/courses'), api('/api/study'), api('/api/popular')])
+      .then(([body, courseBody, studyBody, popularBody]) => {
         if (!cancelled) {
           setVideos(body.videos)
           setCourses(courseBody.courses ?? [])
           setWatchLater(studyBody.watch_later ?? [])
           setStudyNotes(studyBody.notes ?? [])
+          setPopularVideos(popularBody.videos ?? [])
           void loadProgress(body.videos)
         }
       })
@@ -120,6 +126,7 @@ export function Workspace({ user, logout }: WorkspaceProps) {
     setInitialSeek(undefined)
     setView(next)
     setError('')
+    if (next === 'home') void refreshPopular().catch(() => undefined)
     window.scrollTo({ top: 0, behavior: 'smooth' })
   }
 
@@ -272,6 +279,8 @@ export function Workspace({ user, logout }: WorkspaceProps) {
     return (
       <HomeScreen
         videos={videos}
+        popularVideos={popularVideos}
+        popularTitle={user.is_platform_owner ? 'Popular across gyms' : 'Popular in your gym'}
         progress={progress}
         loading={loadingVideos}
         openVideo={openVideo}

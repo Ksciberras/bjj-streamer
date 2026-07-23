@@ -117,6 +117,8 @@ input[type="file"]::file-selector-button { margin-right: .75rem; border: 1px sol
 .video-title-row h2 { margin-bottom: .38rem; font-size: .94rem; line-height: 1.35; }
 .video-card-body p { margin-bottom: .3rem; font-size: .78rem; }
 .video-card-body small { display: block; min-height: 1rem; font-size: .7rem; line-height: 1.4; }
+.video-card-context { display: block; margin: .15rem 0 .45rem; color: var(--accent-hover); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .64rem; }
+.home-section-context { color: var(--subtle); font-size: .66rem; }
 .card-action { display: flex; width: 100%; min-height: 0; justify-content: space-between; margin-top: .9rem; padding: .65rem 0 0; border: 0; border-top: 1px solid var(--border); border-radius: 0; color: var(--accent); background: transparent; font-size: .74rem; }
 .card-action:hover { color: var(--accent-hover); background: transparent; }
 .browse-list { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: .65rem; }

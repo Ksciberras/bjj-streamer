@@ -62,6 +62,9 @@ and completion event per user/video/day. Private note text is never included.
 Students cannot access analytics, and normal staff cannot view another gym's
 activity. The platform owner sees an all-gyms overview and can select one gym
 for a focused report; all-gyms member results include the member's gym.
+Home also shows up to four accessible videos that were studied by the most
+unique learners in the member's gym during the last 30 days. The platform
+owner sees the equivalent platform-wide ranking.
 
 Stop the application without deleting PostgreSQL data:
 

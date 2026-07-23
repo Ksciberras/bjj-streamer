@@ -1,13 +1,13 @@
 import { type FormEvent, useState } from 'react'
 import { EmptyState, Filter, LoadingSkeleton, PageHeader, SectionHeading, Visibility } from '../../components/ui'
 import { formatTime, initials } from '../../lib/format'
-import type { CourseSummary, ProgressMap, Video } from '../../types'
+import type { CourseSummary, PopularVideo, ProgressMap, Video } from '../../types'
 
 type OpenVideo = (video: Video) => void
 type Browse = (filter: { instructor?: string; tag?: string }) => void
 type LibrarySort = 'recent' | 'title' | 'instructor'
 
-export function HomeScreen({ videos, progress, loading, openVideo, browse }: { videos: Video[]; progress: ProgressMap; loading: boolean; openVideo: OpenVideo; browse: Browse }) {
+export function HomeScreen({ videos, popularVideos, popularTitle, progress, loading, openVideo, browse }: { videos: Video[]; popularVideos: PopularVideo[]; popularTitle: string; progress: ProgressMap; loading: boolean; openVideo: OpenVideo; browse: Browse }) {
   const ready = videos.filter((video) => video.status === 'ready')
   const continueVideo = ready
     .filter((video) => (progress[video.id] ?? 0) > 0)
@@ -25,6 +25,20 @@ export function HomeScreen({ videos, progress, loading, openVideo, browse }: { v
           ? <ContinueCard video={continueVideo} savedAt={progress[continueVideo.id]} onResume={() => openVideo(continueVideo)} />
           : <EmptyState title="No saved progress yet" body="Start a video from your library and it will appear here." action={<button onClick={() => browse({})}>Browse library</button>} />}
     </section>
+    {!loading && popularVideos.length > 0 && <section className="section" aria-labelledby="popular-title">
+      <SectionHeading id="popular-title" title={popularTitle} action={<span className="home-section-context">Most studied in the last 30 days</span>} />
+      <div className="video-grid">
+        {popularVideos.map((video) => (
+          <VideoCard
+            key={video.id}
+            video={video}
+            savedAt={progress[video.id]}
+            context={`${video.study_count} ${video.study_count === 1 ? 'learner' : 'learners'}`}
+            onOpen={() => openVideo(video)}
+          />
+        ))}
+      </div>
+    </section>}
     <section className="section" aria-labelledby="recent-title">
       <SectionHeading id="recent-title" title="Recently added" action={<button className="text-button" onClick={() => browse({})}>View library →</button>} />
       {loading
@@ -145,7 +159,7 @@ export function LibraryScreen({ videos, courses = [], progress, loading, initial
   </div>
 }
 
-function VideoCard({ video, savedAt = 0, savedForLater = false, onToggleWatchLater, onOpen }: { video: Video; savedAt?: number; savedForLater?: boolean; onToggleWatchLater?: () => void; onOpen: () => void }) {
+function VideoCard({ video, savedAt = 0, savedForLater = false, context, onToggleWatchLater, onOpen }: { video: Video; savedAt?: number; savedForLater?: boolean; context?: string; onToggleWatchLater?: () => void; onOpen: () => void }) {
   return <article className="video-card">
     <button className="video-cover" onClick={onOpen} aria-label={`Study ${video.title}`}>
       <VideoPlaceholder video={video} label="Study video" />
@@ -154,6 +168,7 @@ function VideoCard({ video, savedAt = 0, savedForLater = false, onToggleWatchLat
     <div className="video-card-body">
       <div className="video-title-row"><h2>{video.title}</h2><Visibility value={video.visibility} /></div>
       <p>{video.instructor_name}</p>
+      {context && <span className="video-card-context">{context}</span>}
       {(video.instructional_name || video.chapter_name) && <small>{[video.instructional_name, video.chapter_name].filter(Boolean).join(' · ')}</small>}
       <button className="card-action" onClick={onOpen}>{savedAt > 0 ? 'Resume' : 'Study video'} <span aria-hidden="true">→</span></button>
       {onToggleWatchLater && <button className="text-button save-later" onClick={onToggleWatchLater}>{savedForLater ? 'Saved for later' : 'Watch later'}</button>}

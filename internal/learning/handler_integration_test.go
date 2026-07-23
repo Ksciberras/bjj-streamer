@@ -156,6 +156,10 @@ func TestPlaybackAuthorizationAndLearningIsolation(t *testing.T) {
 	if response := learningResponse(mux, learningRequest(t, http.MethodPost, "/api/videos/"+sharedID+"/learning-events", map[string]any{"type": "started", "position_seconds": 0}, first)); response.Code != http.StatusNoContent {
 		t.Fatalf("learning event=%d %s", response.Code, response.Body.String())
 	}
+	popular := learningResponse(mux, learningRequest(t, http.MethodGet, "/api/popular", nil, first))
+	if popular.Code != http.StatusOK || !bytes.Contains(popular.Body.Bytes(), []byte(sharedID)) || bytes.Contains(popular.Body.Bytes(), []byte(privateID)) {
+		t.Fatalf("popular=%d %s", popular.Code, popular.Body.String())
+	}
 	if response := learningResponse(mux, learningRequest(t, http.MethodGet, "/api/analytics?period=30", nil, first)); response.Code != http.StatusNotFound {
 		t.Fatalf("student analytics=%d", response.Code)
 	}

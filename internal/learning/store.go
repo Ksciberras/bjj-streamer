@@ -65,6 +65,11 @@ type AnalyticsResult struct {
 	Members  []MemberAnalytics  `json:"members"`
 }
 
+type PopularVideo struct {
+	VideoID    string
+	StudyCount int
+}
+
 type Store struct{ db *pgxpool.Pool }
 
 func NewStore(db *pgxpool.Pool) *Store { return &Store{db: db} }
@@ -82,6 +87,30 @@ func (s *Store) RecordEvent(ctx context.Context, userID, videoID, eventType stri
 		DO UPDATE SET position_seconds=GREATEST(learning_events.position_seconds,EXCLUDED.position_seconds),occurred_at=CURRENT_TIMESTAMP`,
 		userID, videoID, eventType, position)
 	return err
+}
+
+func (s *Store) PopularVideos(ctx context.Context, organizationID *string, platformOwner bool) ([]PopularVideo, error) {
+	rows, err := s.db.Query(ctx, `SELECT video_id,COUNT(DISTINCT user_id)
+		FROM learning_events
+		WHERE occurred_at >= CURRENT_TIMESTAMP - INTERVAL '30 days'
+			AND event_type IN ('started','resumed')
+			AND ($2 OR organization_id=$1)
+		GROUP BY video_id
+		ORDER BY COUNT(DISTINCT user_id) DESC,MAX(occurred_at) DESC,video_id
+		LIMIT 20`, organizationID, platformOwner)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	result := []PopularVideo{}
+	for rows.Next() {
+		var item PopularVideo
+		if err = rows.Scan(&item.VideoID, &item.StudyCount); err != nil {
+			return nil, err
+		}
+		result = append(result, item)
+	}
+	return result, rows.Err()
 }
 
 func (s *Store) Analytics(ctx context.Context, organizationID *string, platformOwner bool, days int) (AnalyticsResult, error) {

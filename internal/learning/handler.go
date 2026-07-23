@@ -42,6 +42,38 @@ func (h *Handler) Register(mux *http.ServeMux) {
 	mux.HandleFunc("DELETE /api/videos/{id}/watch-later", h.removeWatchLater)
 	mux.HandleFunc("POST /api/videos/{id}/learning-events", h.recordEvent)
 	mux.HandleFunc("GET /api/analytics", h.analytics)
+	mux.HandleFunc("GET /api/popular", h.popular)
+}
+
+func (h *Handler) popular(w http.ResponseWriter, r *http.Request) {
+	_, session, ok := h.auth.Authenticate(w, r)
+	if !ok {
+		return
+	}
+	ranked, err := h.store.PopularVideos(r.Context(), session.User.OrganizationID, session.User.IsPlatformOwner)
+	if err != nil {
+		serverError(w)
+		return
+	}
+	type popularVideo struct {
+		videos.Video
+		StudyCount int `json:"study_count"`
+	}
+	result := []popularVideo{}
+	for _, item := range ranked {
+		video, getErr := h.videos.Get(r.Context(), item.VideoID)
+		if getErr != nil || !h.videos.CanView(r.Context(), video, session.User.ID, session.User.Role, session.User.OrganizationID, session.User.IsPlatformOwner) {
+			continue
+		}
+		if video.ThumbnailReady && video.ThumbnailObjectKey != nil {
+			video.ThumbnailURL = "/api/videos/" + video.ID + "/thumbnail"
+		}
+		result = append(result, popularVideo{Video: video, StudyCount: item.StudyCount})
+		if len(result) == 4 {
+			break
+		}
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"videos": result})
 }
 
 func (h *Handler) recordEvent(w http.ResponseWriter, r *http.Request) {
