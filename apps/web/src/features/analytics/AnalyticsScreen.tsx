@@ -1,20 +1,24 @@
 import { useEffect, useState } from 'react'
 import { EmptyState, PageHeader, SectionHeading } from '../../components/ui'
 import { api, errorMessage } from '../../lib/api'
-import type { Analytics } from '../../types'
+import type { Analytics, Organization } from '../../types'
 
 type AnalyticsScreenProps = {
+  organizations: Organization[]
+  platformOwner: boolean
   setError: (message: string) => void
 }
 
-export function AnalyticsScreen({ setError }: AnalyticsScreenProps) {
+export function AnalyticsScreen({ organizations, platformOwner, setError }: AnalyticsScreenProps) {
   const [period, setPeriod] = useState<7 | 30>(30)
+  const [organizationID, setOrganizationID] = useState('')
   const [analytics, setAnalytics] = useState<Analytics>()
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     let cancelled = false
-    void api(`/api/analytics?period=${period}`)
+    const organization = organizationID ? `&organization_id=${encodeURIComponent(organizationID)}` : ''
+    void api(`/api/analytics?period=${period}${organization}`)
       .then((body) => {
         if (!cancelled) setAnalytics(body.analytics)
       })
@@ -25,18 +29,31 @@ export function AnalyticsScreen({ setError }: AnalyticsScreenProps) {
         if (!cancelled) setLoading(false)
       })
     return () => { cancelled = true }
-  }, [period, setError])
+  }, [organizationID, period, setError])
 
   function changePeriod(value: 7 | 30) {
     setLoading(true)
     setPeriod(value)
   }
 
+  function changeOrganization(value: string) {
+    setLoading(true)
+    setOrganizationID(value)
+  }
+
   return (
     <div className="screen analytics-screen">
       <PageHeader title="Analytics" description="See how members are using your gym’s study library." />
       <div className="analytics-toolbar">
-        <span>Study activity</span>
+        {platformOwner ? (
+          <label className="analytics-gym-filter">
+            <span>Gym</span>
+            <select value={organizationID} onChange={(event) => changeOrganization(event.target.value)}>
+              <option value="">All gyms</option>
+              {organizations.map((organization) => <option key={organization.id} value={organization.id}>{organization.name}</option>)}
+            </select>
+          </label>
+        ) : <span>Study activity</span>}
         <div className="period-switcher" role="group" aria-label="Analytics period">
           <button type="button" className={period === 7 ? 'active' : ''} onClick={() => changePeriod(7)}>7 days</button>
           <button type="button" className={period === 30 ? 'active' : ''} onClick={() => changePeriod(30)}>30 days</button>
@@ -71,10 +88,11 @@ export function AnalyticsScreen({ setError }: AnalyticsScreenProps) {
             {analytics.members.length ? (
               <div className="responsive-table surface analytics-table">
                 <table>
-                  <thead><tr><th>Member</th><th>Last active</th><th>Videos studied</th><th>Notes</th></tr></thead>
+                  <thead><tr><th>Member</th>{platformOwner && !organizationID && <th>Gym</th>}<th>Last active</th><th>Videos studied</th><th>Notes</th></tr></thead>
                   <tbody>{analytics.members.map((item) => (
                     <tr key={item.user_id}>
                       <td><strong>{item.email}</strong></td>
+                      {platformOwner && !organizationID && <td>{item.organization_name}</td>}
                       <td>{item.last_active_at ? new Date(item.last_active_at).toLocaleDateString() : 'No activity'}</td>
                       <td>{item.videos_started}</td><td>{item.notes}</td>
                     </tr>

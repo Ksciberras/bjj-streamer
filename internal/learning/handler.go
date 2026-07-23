@@ -75,11 +75,22 @@ func (h *Handler) analytics(w http.ResponseWriter, r *http.Request) {
 		notFound(w)
 		return
 	}
+	organizationID := session.User.OrganizationID
+	platformWide := session.User.IsPlatformOwner
+	requestedOrganization := strings.TrimSpace(r.URL.Query().Get("organization_id"))
+	if requestedOrganization != "" {
+		if !session.User.IsPlatformOwner || !h.store.OrganizationExists(r.Context(), requestedOrganization) {
+			notFound(w)
+			return
+		}
+		organizationID = &requestedOrganization
+		platformWide = false
+	}
 	days := 30
 	if r.URL.Query().Get("period") == "7" {
 		days = 7
 	}
-	result, err := h.store.Analytics(r.Context(), session.User.OrganizationID, session.User.IsPlatformOwner, days)
+	result, err := h.store.Analytics(r.Context(), organizationID, platformWide, days)
 	if err != nil {
 		serverError(w)
 		return

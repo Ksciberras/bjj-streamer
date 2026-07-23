@@ -90,6 +90,7 @@ describe('App', () => {
       if (input === '/api/auth/session') return { ok: true, status: 200, json: async () => ({ user: { id: 'owner', email: 'kyranu2@gmail.com', role: 'admin', is_platform_owner: true } }) }
       if (input === '/api/platform/organizations') return { ok: true, status: 200, json: async () => ({ organizations: [{ id: 'gym', name: 'BJJ Cork', slug: 'bjj-cork' }] }) }
       if (input === '/api/platform/availability') return { ok: true, status: 200, json: async () => ({ videos: [], courses: [] }) }
+      if (input.startsWith('/api/analytics')) return { ok: true, status: 200, json: async () => ({ analytics: { days: 30, overview: { active_learners: 0, videos_started: 0, resumes: 0, notes_created: 0 }, content: [], members: [] } }) }
       if (input === '/api/admin/users') return { ok: true, status: 200, json: async () => ({ users: [] }) }
       if (input === '/api/courses') return { ok: true, status: 200, json: async () => ({ courses: [] }) }
       if (input === '/api/study') return { ok: true, status: 200, json: async () => ({ watch_later: [], notes: [] }) }
@@ -101,5 +102,9 @@ describe('App', () => {
     expect(screen.getByRole('heading', { name: 'Content availability' })).toBeInTheDocument()
     expect(screen.getByRole('combobox', { name: 'Gym' })).toBeRequired()
     expect(screen.getByRole('button', { name: 'Create gym' })).toBeInTheDocument()
+    fireEvent.click(screen.getAllByRole('button', { name: 'Analytics' })[0])
+    expect(await screen.findByRole('combobox', { name: 'Gym' })).toHaveValue('')
+    expect(screen.getByRole('option', { name: 'All gyms' })).toBeInTheDocument()
+    expect(screen.getByRole('option', { name: 'BJJ Cork' })).toBeInTheDocument()
   })
 })

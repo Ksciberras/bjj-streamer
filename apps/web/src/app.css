@@ -298,6 +298,8 @@ td small { margin-top: .2rem; }
   color: var(--muted);
   font-size: .72rem;
 }
+.analytics-gym-filter { display: flex; align-items: center; gap: .6rem; }
+.analytics-gym-filter select { width: min(240px, 48vw); min-height: 34px; padding: .35rem 2rem .35rem .6rem; }
 .period-switcher { display: flex; gap: .25rem; padding: .2rem; border: 1px solid var(--border); border-radius: 6px; background: var(--surface); }
 .period-switcher button { width: auto; min-height: 32px; padding: .35rem .7rem; border-color: transparent; background: transparent; font-size: .68rem; }
 .period-switcher button.active { border-color: var(--border-strong); color: var(--text); background: var(--surface-hover); }

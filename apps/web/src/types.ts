@@ -86,6 +86,7 @@ export type Analytics = {
   members: Array<{
     user_id: string
     email: string
+    organization_name: string
     last_active_at?: string
     videos_started: number
     notes: number

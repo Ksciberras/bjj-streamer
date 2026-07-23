@@ -163,4 +163,7 @@ func TestPlaybackAuthorizationAndLearningIsolation(t *testing.T) {
 	if analytics.Code != http.StatusOK || !bytes.Contains(analytics.Body.Bytes(), []byte(`"active_learners":1`)) || bytes.Contains(analytics.Body.Bytes(), []byte("First user's note")) {
 		t.Fatalf("analytics=%d %s", analytics.Code, analytics.Body.String())
 	}
+	if response := learningResponse(mux, learningRequest(t, http.MethodGet, "/api/analytics?organization_id=00000000-0000-0000-0000-000000000000", nil, instructor)); response.Code != http.StatusNotFound {
+		t.Fatalf("instructor cross-gym analytics=%d", response.Code)
+	}
 }

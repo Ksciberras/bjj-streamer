@@ -50,11 +50,12 @@ type ContentAnalytics struct {
 }
 
 type MemberAnalytics struct {
-	UserID        string     `json:"user_id"`
-	Email         string     `json:"email"`
-	LastActiveAt  *time.Time `json:"last_active_at"`
-	VideosStarted int        `json:"videos_started"`
-	Notes         int        `json:"notes"`
+	UserID           string     `json:"user_id"`
+	Email            string     `json:"email"`
+	OrganizationName string     `json:"organization_name"`
+	LastActiveAt     *time.Time `json:"last_active_at"`
+	VideosStarted    int        `json:"videos_started"`
+	Notes            int        `json:"notes"`
 }
 
 type AnalyticsResult struct {
@@ -67,6 +68,11 @@ type AnalyticsResult struct {
 type Store struct{ db *pgxpool.Pool }
 
 func NewStore(db *pgxpool.Pool) *Store { return &Store{db: db} }
+
+func (s *Store) OrganizationExists(ctx context.Context, organizationID string) bool {
+	var exists bool
+	return s.db.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM organizations WHERE id=$1)`, organizationID).Scan(&exists) == nil && exists
+}
 
 func (s *Store) RecordEvent(ctx context.Context, userID, videoID, eventType string, position float64) error {
 	_, err := s.db.Exec(ctx, `INSERT INTO learning_events(organization_id,user_id,video_id,event_type,position_seconds)
@@ -117,12 +123,13 @@ func (s *Store) Analytics(ctx context.Context, organizationID *string, platformO
 		result.Content = append(result.Content, item)
 	}
 	rows.Close()
-	rows, err = s.db.Query(ctx, `SELECT u.id,u.email,MAX(le.occurred_at),
+	rows, err = s.db.Query(ctx, `SELECT u.id,u.email,o.name,MAX(le.occurred_at),
 		COUNT(DISTINCT le.video_id) FILTER (WHERE le.event_type IN ('started','resumed')),
 		(SELECT COUNT(*) FROM notes n WHERE n.user_id=u.id AND n.created_at >= $3)
-		FROM users u LEFT JOIN learning_events le ON le.user_id=u.id AND le.occurred_at >= $3
+		FROM users u JOIN organizations o ON o.id=u.organization_id
+		LEFT JOIN learning_events le ON le.user_id=u.id AND le.occurred_at >= $3
 		WHERE u.disabled_at IS NULL AND NOT u.is_platform_owner AND ($2 OR u.organization_id=$1)
-		GROUP BY u.id ORDER BY MAX(le.occurred_at) DESC NULLS LAST,u.email`,
+		GROUP BY u.id,o.name ORDER BY MAX(le.occurred_at) DESC NULLS LAST,u.email`,
 		organizationID, platformOwner, since)
 	if err != nil {
 		return AnalyticsResult{}, err
@@ -130,7 +137,7 @@ func (s *Store) Analytics(ctx context.Context, organizationID *string, platformO
 	defer rows.Close()
 	for rows.Next() {
 		var item MemberAnalytics
-		if err = rows.Scan(&item.UserID, &item.Email, &item.LastActiveAt, &item.VideosStarted, &item.Notes); err != nil {
+		if err = rows.Scan(&item.UserID, &item.Email, &item.OrganizationName, &item.LastActiveAt, &item.VideosStarted, &item.Notes); err != nil {
 			return AnalyticsResult{}, err
 		}
 		result.Members = append(result.Members, item)

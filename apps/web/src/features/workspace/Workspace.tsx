@@ -250,7 +250,7 @@ export function Workspace({ user, logout }: WorkspaceProps) {
     }
 
     if (view === 'analytics' && canUpload) {
-      return <AnalyticsScreen setError={setError} />
+      return <AnalyticsScreen organizations={organizations} platformOwner={Boolean(user.is_platform_owner)} setError={setError} />
     }
 
     if (view === 'admin' && user.role === 'admin') {
