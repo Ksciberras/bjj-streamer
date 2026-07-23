@@ -61,6 +61,21 @@ func TestBootstrapCanOnlyRunOnce(t *testing.T) {
 	}
 }
 
+func TestFreshBootstrapRecognizesDesignatedPlatformOwner(t *testing.T) {
+	s, _ := integrationStore(t)
+	hash, err := HashPassword("secure platform password")
+	if err != nil {
+		t.Fatal(err)
+	}
+	user, err := s.BootstrapAdmin(context.Background(), platformOwnerEmail, hash)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !user.IsPlatformOwner || user.OrganizationID != nil {
+		t.Fatalf("platform owner bootstrap=%+v", user)
+	}
+}
+
 func TestSessionsRotateRevokeExpireAndHonorDisabledUser(t *testing.T) {
 	s, pool := integrationStore(t)
 	user := bootstrap(t, s)

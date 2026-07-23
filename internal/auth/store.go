@@ -14,6 +14,8 @@ var ErrInvalidCredentials = errors.New("invalid credentials")
 var ErrUnauthenticated = errors.New("unauthenticated")
 var ErrBootstrapComplete = errors.New("bootstrap already completed")
 
+const platformOwnerEmail = "kyranu2@gmail.com"
+
 type Store struct {
 	db  *pgxpool.Pool
 	now func() time.Time
@@ -40,7 +42,12 @@ func (s *Store) BootstrapAdmin(ctx context.Context, email, passwordHash string) 
 		return User{}, ErrBootstrapComplete
 	}
 	var user User
-	err = tx.QueryRow(ctx, `INSERT INTO users (email,password_hash,role) VALUES ($1,$2,'admin') RETURNING id,email,role`, normalizeEmail(email), passwordHash).Scan(&user.ID, &user.Email, &user.Role)
+	normalizedEmail := normalizeEmail(email)
+	err = tx.QueryRow(ctx, `INSERT INTO users (email,password_hash,role,organization_id,is_platform_owner)
+		VALUES ($1,$2,'admin',CASE WHEN $1=$3 THEN NULL ELSE (SELECT id FROM organizations ORDER BY created_at,id LIMIT 1) END,$1=$3)
+		RETURNING id,email,role,organization_id,is_platform_owner`,
+		normalizedEmail, passwordHash, platformOwnerEmail,
+	).Scan(&user.ID, &user.Email, &user.Role, &user.OrganizationID, &user.IsPlatformOwner)
 	if err != nil {
 		return User{}, err
 	}

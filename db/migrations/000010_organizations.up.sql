@@ -1,6 +1,10 @@
 DO $$ BEGIN
-  IF NOT EXISTS (SELECT 1 FROM users WHERE email='kyranu2@gmail.com') THEN RAISE EXCEPTION 'missing platform owner account'; END IF;
-  IF NOT EXISTS (SELECT 1 FROM users WHERE email='info@bjjcork.com') THEN RAISE EXCEPTION 'missing BJJ Cork admin account'; END IF;
+  IF EXISTS (SELECT 1 FROM users) AND NOT EXISTS (SELECT 1 FROM users WHERE email='kyranu2@gmail.com') THEN
+    RAISE EXCEPTION 'missing platform owner account';
+  END IF;
+  IF EXISTS (SELECT 1 FROM users) AND NOT EXISTS (SELECT 1 FROM users WHERE email='info@bjjcork.com') THEN
+    RAISE EXCEPTION 'missing BJJ Cork admin account';
+  END IF;
 END $$;
 
 CREATE TABLE organizations (
