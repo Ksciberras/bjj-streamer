@@ -203,10 +203,12 @@ export function StudyScreen({ video, course, autoPlay, initialSeek, savedForLate
 
   return (
     <div className="screen study-screen">
-      <button className="back-button" onClick={() => void back()}>← Back to library</button>
-      <button className="secondary-button watch-later-player" type="button" onClick={onToggleWatchLater}>
-        {savedForLater ? 'Remove from Watch later' : 'Save to Watch later'}
-      </button>
+      <div className="study-toolbar">
+        <button className="back-button" onClick={() => void back()}>← Back to library</button>
+        <button className="secondary-button watch-later-player" type="button" onClick={onToggleWatchLater}>
+          {savedForLater ? 'Remove from Watch later' : 'Save to Watch later'}
+        </button>
+      </div>
       <div className="study-layout">
         <Player
           video={video}
@@ -266,13 +268,22 @@ type PlayerProps = {
 function Player({ video, player, url, loading, resumeAt, onTimeUpdate, onPause, onEnded, autoplayBlocked, onResumeAutoplay }: PlayerProps) {
   return (
     <section className="player-column" aria-labelledby="video-title">
+      <header className="player-heading">
+        <div>
+          <span className="editorial-label">Now studying</span>
+          <h1 id="video-title">{video.title}</h1>
+          <p>{video.instructor_name}{video.chapter_name ? ` · ${video.chapter_name}` : ''}</p>
+        </div>
+        <Visibility value={video.visibility} />
+      </header>
       <div className="player-frame">
         {loading
-          ? <div className="player-loading">Loading video…</div>
+          ? <div className="player-loading"><span aria-hidden="true" /><strong>Preparing video</strong><small>Requesting secure playback…</small></div>
         : url
           ? <video
               ref={player}
               src={url}
+              poster={video.thumbnail_url}
               controls
               playsInline
               preload="metadata"
@@ -287,17 +298,7 @@ function Player({ video, player, url, loading, resumeAt, onTimeUpdate, onPause, 
         {autoplayBlocked && <button className="autoplay-prompt" type="button" onClick={onResumeAutoplay}>Play next chapter</button>}
       </div>
       <div className="player-details">
-        <div>
-          <div className="detail-line">
-            <Visibility value={video.visibility} />
-            <span>{video.instructional_name || 'Instructional video'}</span>
-          </div>
-          <h1 id="video-title">{video.title}</h1>
-          <p>{video.instructor_name}{video.chapter_name ? ` · ${video.chapter_name}` : ''}</p>
-          {resumeAt > 0 && (
-            <p className="resume-detail">Resumed from <code>{formatTime(resumeAt)}</code></p>
-          )}
-        </div>
+        <div className="detail-line"><span>{video.instructional_name || 'Instructional video'}</span>{resumeAt > 0 && <span className="resume-detail">Resumed at <code>{formatTime(resumeAt)}</code></span>}</div>
         {video.tags.length > 0 && (
           <div className="tag-list compact">
             {video.tags.map((tag) => <span key={tag}>{tag}</span>)}

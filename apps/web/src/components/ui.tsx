@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react'
+import { useEffect, useRef, type ReactNode } from 'react'
 import type { Video } from '../types'
 import { labelize } from '../lib/format'
 
@@ -11,6 +11,7 @@ export function Wordmark({ detail = false }: { detail?: boolean }) {
 
 export function PageHeader({ title, description }: { title: string; description: string }) {
   return <header className="page-header">
+    <span className="page-kicker">RollStudy workspace</span>
     <h1>{title}</h1>
     <p>{description}</p>
   </header>
@@ -36,6 +37,35 @@ export function WorkspaceTabs<T extends string>({ label, value, items, onChange 
       {item.label}{item.count !== undefined && <span>{item.count}</span>}
     </button>)}
   </div>
+}
+
+export function Dialog({ title, description, onClose, children }: { title: string; description?: string; onClose: () => void; children: ReactNode }) {
+  const dialog = useRef<HTMLDialogElement>(null)
+  const titleID = `dialog-${title.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`
+
+  useEffect(() => {
+    if (typeof dialog.current?.showModal === 'function') dialog.current.showModal()
+    else dialog.current?.setAttribute('open', '')
+  }, [])
+
+  return <dialog
+    ref={dialog}
+    className="app-dialog"
+    aria-labelledby={titleID}
+    onCancel={(event) => {
+      event.preventDefault()
+      onClose()
+    }}
+    onClick={(event) => {
+      if (event.target === dialog.current) onClose()
+    }}
+  >
+    <div className="dialog-header">
+      <div><h2 id={titleID}>{title}</h2>{description && <p>{description}</p>}</div>
+      <button type="button" className="dialog-close" aria-label="Close dialog" onClick={onClose}>×</button>
+    </div>
+    <div className="dialog-body">{children}</div>
+  </dialog>
 }
 
 export function Visibility({ value }: { value: Video['visibility'] }) {

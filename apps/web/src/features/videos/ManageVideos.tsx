@@ -1,5 +1,5 @@
-import type { FormEvent } from 'react'
-import { EmptyState, SectionHeading } from '../../components/ui'
+import { useState, type FormEvent } from 'react'
+import { Dialog, EmptyState, SectionHeading } from '../../components/ui'
 import { api, errorMessage } from '../../lib/api'
 import { labelize } from '../../lib/format'
 import { uploadToStorage } from '../../lib/objectUpload'
@@ -12,11 +12,13 @@ type ManageVideosProps = {
 }
 
 export function ManageVideos({ videos, onUpdate, onError }: ManageVideosProps) {
+  const [editingVideo, setEditingVideo] = useState<Video>()
   async function deleteVideo(video: Video) {
     if (!window.confirm(`Delete “${video.title}” from the library? Its stored file and study history will be retained.`)) return
     try {
       await api(`/api/videos/${video.id}`, { method: 'DELETE', body: '{}' })
       await onUpdate()
+      setEditingVideo(undefined)
     } catch (reason) {
       onError(errorMessage(reason, 'Unable to delete video'))
     }
@@ -64,12 +66,13 @@ export function ManageVideos({ videos, onUpdate, onError }: ManageVideosProps) {
         }),
       })
       await onUpdate()
+      setEditingVideo(undefined)
     } catch (reason) {
       onError(errorMessage(reason, 'Unable to update video'))
     }
   }
 
-  return (
+  return (<>
     <section className="surface manage-panel">
       <SectionHeading title="Manage videos" />
       <div className="responsive-table">
@@ -101,67 +104,7 @@ export function ManageVideos({ videos, onUpdate, onError }: ManageVideosProps) {
                 <td>{labelize(video.content_basis)}</td>
                 <td>{labelize(video.status)}</td>
                 <td>
-                  <div className="manage-row-actions">
-                    <details className="row-editor">
-                      <summary>Actions</summary>
-                      <form onSubmit={(event) => void updateVideo(event, video)}>
-                      <label>
-                        Title
-                        <input name="title" defaultValue={video.title} required />
-                      </label>
-                      <label>
-                        Instructor
-                        <input name="instructor_name" defaultValue={video.instructor_name} required />
-                      </label>
-                      <label>
-                        Instructional / series
-                        <input name="instructional_name" defaultValue={video.instructional_name} />
-                      </label>
-                      <label>
-                        Chapter
-                        <input name="chapter_name" defaultValue={video.chapter_name} />
-                      </label>
-                      <label>
-                        Description
-                        <textarea name="description" defaultValue={video.description} />
-                      </label>
-                      <label>
-                        Tags, comma separated
-                        <input name="tags" defaultValue={video.tags.join(', ')} />
-                      </label>
-                      <label>
-                        Visibility
-                        <select name="visibility" defaultValue={video.visibility}>
-                          <option value="shared">Shared</option>
-                          <option value="private">Private</option>
-                        </select>
-                      </label>
-                      <label>
-                        Content basis
-                        <select name="content_basis" defaultValue={video.content_basis}>
-                          <option value="self_created">Self-created</option>
-                          <option value="licensed_for_group">Licensed</option>
-                          <option value="personal_purchase">Personal purchase</option>
-                        </select>
-                      </label>
-                      <label>
-                        Replace thumbnail
-                        <input
-                          type="file"
-                          accept="image/jpeg,image/png,image/webp,.jpg,.jpeg,.png,.webp"
-                          onChange={(event) => {
-                            const file = event.target.files?.[0]
-                            if (file) void uploadThumbnail(video, file)
-                          }}
-                        />
-                      </label>
-                      <div className="row-editor-actions">
-                        <button type="button" className="danger-button" onClick={() => void deleteVideo(video)}>Delete video</button>
-                        <button type="submit">Save changes</button>
-                      </div>
-                      </form>
-                    </details>
-                  </div>
+                  <button type="button" className="table-action" onClick={() => setEditingVideo(video)}>Edit</button>
                 </td>
               </tr>
             ))}
@@ -172,5 +115,21 @@ export function ManageVideos({ videos, onUpdate, onError }: ManageVideosProps) {
         )}
       </div>
     </section>
-  )
+    {editingVideo && <Dialog title="Edit video" description={editingVideo.title} onClose={() => setEditingVideo(undefined)}>
+      <form className="dialog-form" onSubmit={(event) => void updateVideo(event, editingVideo)}>
+        <div className="dialog-field-grid">
+          <label>Title<input name="title" defaultValue={editingVideo.title} required /></label>
+          <label>Instructor<input name="instructor_name" defaultValue={editingVideo.instructor_name} required /></label>
+          <label>Instructional / series<input name="instructional_name" defaultValue={editingVideo.instructional_name} /></label>
+          <label>Chapter<input name="chapter_name" defaultValue={editingVideo.chapter_name} /></label>
+          <label className="dialog-full">Description<textarea name="description" defaultValue={editingVideo.description} /></label>
+          <label className="dialog-full">Tags, comma separated<input name="tags" defaultValue={editingVideo.tags.join(', ')} /></label>
+          <label>Visibility<select name="visibility" defaultValue={editingVideo.visibility}><option value="shared">Shared</option><option value="private">Private</option></select></label>
+          <label>Content basis<select name="content_basis" defaultValue={editingVideo.content_basis}><option value="self_created">Self-created</option><option value="licensed_for_group">Licensed</option><option value="personal_purchase">Personal purchase</option></select></label>
+          <label className="dialog-full">Replace thumbnail<input type="file" accept="image/jpeg,image/png,image/webp,.jpg,.jpeg,.png,.webp" onChange={(event) => { const file = event.target.files?.[0]; if (file) void uploadThumbnail(editingVideo, file) }} /></label>
+        </div>
+        <div className="dialog-actions dialog-actions-split"><button type="button" className="danger-button" onClick={() => void deleteVideo(editingVideo)}>Delete video</button><span><button type="button" className="secondary-button" onClick={() => setEditingVideo(undefined)}>Cancel</button><button type="submit">Save changes</button></span></div>
+      </form>
+    </Dialog>}
+  </>)
 }

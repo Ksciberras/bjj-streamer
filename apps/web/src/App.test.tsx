@@ -31,6 +31,10 @@ describe('App', () => {
 	expect(screen.getByLabelText(/^Course MP4 files/)).toHaveAttribute('multiple')
 	fireEvent.click(screen.getAllByRole('button', { name: 'Admin' })[0])
 	expect(screen.getByRole('heading', { name: 'Create account' })).toBeInTheDocument()
+	fireEvent.click(screen.getByRole('button', { name: 'Edit' }))
+	expect(screen.getByRole('dialog', { name: 'Edit member' })).toBeInTheDocument()
+	fireEvent.click(screen.getByRole('button', { name: 'Close dialog' }))
+	expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
   })
 
   it('shows upload but not administration to an instructor', async () => {

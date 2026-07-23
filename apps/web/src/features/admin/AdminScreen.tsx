@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from 'react'
-import { PageHeader, SectionHeading, WorkspaceTabs } from '../../components/ui'
+import { Dialog, PageHeader, SectionHeading, WorkspaceTabs } from '../../components/ui'
 import { api, errorMessage } from '../../lib/api'
 import type { CourseSummary, Organization, User, Video } from '../../types'
 import { PlatformGyms } from './PlatformGyms'
@@ -26,6 +26,7 @@ export function AdminScreen({
   setNotice,
 }: AdminScreenProps) {
   const [workspace, setWorkspace] = useState<'members' | 'gyms' | 'access'>('members')
+  const [editingUser, setEditingUser] = useState<User>()
   async function createUser(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     const form = event.currentTarget
@@ -59,6 +60,7 @@ export function AdminScreen({
         body: JSON.stringify({
           role: data.get('role'),
           disabled: data.get('disabled') === 'on',
+          organization_id: platformOwner && !target.is_platform_owner ? data.get('organization_id') : undefined,
         }),
       })
 
@@ -72,22 +74,9 @@ export function AdminScreen({
 
       await onRefreshUsers()
       setNotice(`Updated ${target.email}.`)
+      setEditingUser(undefined)
     } catch (reason) {
       setError(errorMessage(reason, 'Unable to update user'))
-    }
-  }
-
-  async function moveUser(target: User, organizationID: string) {
-    try {
-      await api(`/api/admin/users/${target.id}`, {
-        method: 'PATCH',
-        body: JSON.stringify({ organization_id: organizationID }),
-      })
-      await onRefreshUsers()
-      setNotice(`Moved ${target.email} to its new gym. Their active sessions were signed out.`)
-    } catch (reason) {
-      await onRefreshUsers()
-      setError(errorMessage(reason, 'Unable to move account'))
     }
   }
 
@@ -148,7 +137,6 @@ export function AdminScreen({
                 <th>Role</th>
                 {platformOwner && <th>Gym</th>}
                 <th>Status</th>
-                <th>Password reset</th>
                 <th>Action</th>
               </tr>
             </thead>
@@ -160,52 +148,22 @@ export function AdminScreen({
                     {item.is_platform_owner && <small className="platform-owner-label">Platform owner</small>}
                   </td>
                   <td>
-                    <select form={`member-${item.id}`} name="role" defaultValue={item.role} aria-label={`Role for ${item.email}`} disabled={item.is_platform_owner}>
-                      <option value="admin">Admin</option>
-                      <option value="instructor">Instructor</option>
-                      <option value="student">Student</option>
-                    </select>
+                    <span className="table-value">{item.role}</span>
                   </td>
                   {platformOwner && (
                     <td>
                       {item.is_platform_owner
                         ? <span className="platform-scope">All gyms</span>
                         : (
-                          <select
-                            className="gym-select"
-                            key={`${item.id}:${item.organization_id}`}
-                            defaultValue={item.organization_id}
-                            aria-label={`Gym for ${item.email}`}
-                            required
-                            onChange={(event) => void moveUser(item, event.target.value)}
-                          >
-                            {organizations.map((organization) => <option value={organization.id} key={organization.id}>{organization.name}</option>)}
-                          </select>
+                          <span className="table-value">{organizations.find((organization) => organization.id === item.organization_id)?.name ?? 'Unassigned'}</span>
                         )}
                     </td>
                   )}
                   <td>
-                    <label className="member-status">
-                      <input form={`member-${item.id}`} name="disabled" type="checkbox" defaultChecked={item.disabled} disabled={item.is_platform_owner} />
-                      <span>{item.disabled ? 'Disabled' : 'Enabled'}</span>
-                    </label>
+                    <span className={`status-label ${item.disabled ? 'disabled' : 'enabled'}`}>{item.disabled ? 'Disabled' : 'Enabled'}</span>
                   </td>
                   <td>
-                    <input
-                      form={`member-${item.id}`}
-                      name="password"
-                      type="password"
-                      minLength={12}
-                      placeholder="Leave unchanged"
-                      aria-label={`New password for ${item.email}`}
-                      autoComplete="new-password"
-                      disabled={item.is_platform_owner}
-                    />
-                  </td>
-                  <td>
-                    <form id={`member-${item.id}`} onSubmit={(event) => void updateUser(event, item)}>
-                      <button type="submit" className="member-save" disabled={item.is_platform_owner}>Save changes</button>
-                    </form>
+                    <button type="button" className="table-action" disabled={item.is_platform_owner} onClick={() => setEditingUser(item)}>{item.is_platform_owner ? 'Protected' : 'Edit'}</button>
                   </td>
                 </tr>
               ))}
@@ -216,6 +174,17 @@ export function AdminScreen({
       </>}
       {platformOwner && workspace === 'gyms' && <PlatformGyms mode="gyms" organizations={organizations} videos={videos} courses={courses} setError={setError} setNotice={setNotice} />}
       {platformOwner && workspace === 'access' && <PlatformGyms mode="access" organizations={organizations} videos={videos} courses={courses} setError={setError} setNotice={setNotice} />}
+      {editingUser && <Dialog title="Edit member" description={editingUser.email} onClose={() => setEditingUser(undefined)}>
+        <form className="dialog-form" onSubmit={(event) => void updateUser(event, editingUser)}>
+          <div className="dialog-field-grid">
+            <label>Role<select name="role" defaultValue={editingUser.role}><option value="student">Student</option><option value="instructor">Instructor</option><option value="admin">Admin</option></select></label>
+            {platformOwner && <label>Gym<select name="organization_id" defaultValue={editingUser.organization_id} required>{organizations.map((organization) => <option value={organization.id} key={organization.id}>{organization.name}</option>)}</select></label>}
+            <label className="dialog-full">New password<input name="password" type="password" minLength={12} placeholder="Leave unchanged" autoComplete="new-password" /></label>
+            <label className="dialog-check"><input name="disabled" type="checkbox" defaultChecked={editingUser.disabled} /><span>Disable this account</span></label>
+          </div>
+          <div className="dialog-actions"><button type="button" className="secondary-button" onClick={() => setEditingUser(undefined)}>Cancel</button><button type="submit">Save changes</button></div>
+        </form>
+      </Dialog>}
     </div>
   )
 }
