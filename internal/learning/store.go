@@ -58,9 +58,17 @@ type MemberAnalytics struct {
 	Notes            int        `json:"notes"`
 }
 
+type DailyActivity struct {
+	Date           time.Time `json:"date"`
+	ActiveLearners int       `json:"active_learners"`
+	StudyActions   int       `json:"study_actions"`
+	NotesCreated   int       `json:"notes_created"`
+}
+
 type AnalyticsResult struct {
 	Days     int                `json:"days"`
 	Overview AnalyticsOverview  `json:"overview"`
+	Activity []DailyActivity    `json:"activity"`
 	Content  []ContentAnalytics `json:"content"`
 	Members  []MemberAnalytics  `json:"members"`
 }
@@ -114,8 +122,8 @@ func (s *Store) PopularVideos(ctx context.Context, organizationID *string, platf
 }
 
 func (s *Store) Analytics(ctx context.Context, organizationID *string, platformOwner bool, days int) (AnalyticsResult, error) {
-	result := AnalyticsResult{Days: days, Content: []ContentAnalytics{}, Members: []MemberAnalytics{}}
-	since := time.Now().AddDate(0, 0, -days)
+	result := AnalyticsResult{Days: days, Activity: []DailyActivity{}, Content: []ContentAnalytics{}, Members: []MemberAnalytics{}}
+	since := time.Now().UTC().Truncate(24*time.Hour).AddDate(0, 0, -(days - 1))
 	err := s.db.QueryRow(ctx, `SELECT
 		COUNT(DISTINCT le.user_id),
 		COUNT(DISTINCT (le.user_id,le.video_id)) FILTER (WHERE le.event_type IN ('started','resumed')),
@@ -129,7 +137,43 @@ func (s *Store) Analytics(ctx context.Context, organizationID *string, platformO
 	if err != nil {
 		return AnalyticsResult{}, err
 	}
-	rows, err := s.db.Query(ctx, `SELECT v.id,v.title,v.instructor_name,
+	rows, err := s.db.Query(ctx, `WITH days AS (
+			SELECT generate_series($3::date,CURRENT_DATE,INTERVAL '1 day')::date AS day
+		),
+		event_activity AS (
+			SELECT occurred_at::date AS day,COUNT(DISTINCT user_id) AS active_learners,COUNT(*) AS study_actions
+			FROM learning_events
+			WHERE occurred_at >= $3 AND ($2 OR organization_id=$1)
+			GROUP BY occurred_at::date
+		),
+		note_activity AS (
+			SELECT n.created_at::date AS day,COUNT(*) AS notes_created
+			FROM notes n JOIN users u ON u.id=n.user_id
+			WHERE n.created_at >= $3 AND ($2 OR u.organization_id=$1)
+			GROUP BY n.created_at::date
+		)
+		SELECT d.day,COALESCE(e.active_learners,0),COALESCE(e.study_actions,0),COALESCE(n.notes_created,0)
+		FROM days d
+		LEFT JOIN event_activity e ON e.day=d.day
+		LEFT JOIN note_activity n ON n.day=d.day
+		ORDER BY d.day`, organizationID, platformOwner, since)
+	if err != nil {
+		return AnalyticsResult{}, err
+	}
+	for rows.Next() {
+		var item DailyActivity
+		if err = rows.Scan(&item.Date, &item.ActiveLearners, &item.StudyActions, &item.NotesCreated); err != nil {
+			rows.Close()
+			return AnalyticsResult{}, err
+		}
+		result.Activity = append(result.Activity, item)
+	}
+	if err = rows.Err(); err != nil {
+		rows.Close()
+		return AnalyticsResult{}, err
+	}
+	rows.Close()
+	rows, err = s.db.Query(ctx, `SELECT v.id,v.title,v.instructor_name,
 		COUNT(DISTINCT le.user_id),
 		COUNT(*) FILTER (WHERE le.event_type='started'),
 		COUNT(*) FILTER (WHERE le.event_type='resumed'),
@@ -152,13 +196,16 @@ func (s *Store) Analytics(ctx context.Context, organizationID *string, platformO
 		result.Content = append(result.Content, item)
 	}
 	rows.Close()
-	rows, err = s.db.Query(ctx, `SELECT u.id,u.email,o.name,MAX(le.occurred_at),
+	rows, err = s.db.Query(ctx, `SELECT u.id,u.email,o.name,
+		GREATEST(MAX(le.occurred_at),(SELECT MAX(n.updated_at) FROM notes n WHERE n.user_id=u.id AND n.updated_at >= $3)),
 		COUNT(DISTINCT le.video_id) FILTER (WHERE le.event_type IN ('started','resumed')),
 		(SELECT COUNT(*) FROM notes n WHERE n.user_id=u.id AND n.created_at >= $3)
 		FROM users u JOIN organizations o ON o.id=u.organization_id
 		LEFT JOIN learning_events le ON le.user_id=u.id AND le.occurred_at >= $3
 		WHERE u.disabled_at IS NULL AND NOT u.is_platform_owner AND ($2 OR u.organization_id=$1)
-		GROUP BY u.id,o.name ORDER BY MAX(le.occurred_at) DESC NULLS LAST,u.email`,
+		GROUP BY u.id,o.name ORDER BY
+			GREATEST(MAX(le.occurred_at),(SELECT MAX(n.updated_at) FROM notes n WHERE n.user_id=u.id AND n.updated_at >= $3)) DESC NULLS LAST,
+			u.email`,
 		organizationID, platformOwner, since)
 	if err != nil {
 		return AnalyticsResult{}, err

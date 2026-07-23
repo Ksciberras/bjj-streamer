@@ -77,6 +77,12 @@ export type Analytics = {
     resumes: number
     notes_created: number
   }
+  activity: Array<{
+    date: string
+    active_learners: number
+    study_actions: number
+    notes_created: number
+  }>
   content: Array<{
     video_id: string
     title: string

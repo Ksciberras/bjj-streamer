@@ -156,6 +156,9 @@ func TestPlaybackAuthorizationAndLearningIsolation(t *testing.T) {
 	if response := learningResponse(mux, learningRequest(t, http.MethodPost, "/api/videos/"+sharedID+"/learning-events", map[string]any{"type": "started", "position_seconds": 0}, first)); response.Code != http.StatusNoContent {
 		t.Fatalf("learning event=%d %s", response.Code, response.Body.String())
 	}
+	if _, err = NewStore(pool).CreateNote(context.Background(), second.id, sharedID, 18, "Second user's private note"); err != nil {
+		t.Fatal(err)
+	}
 	popular := learningResponse(mux, learningRequest(t, http.MethodGet, "/api/popular", nil, first))
 	if popular.Code != http.StatusOK || !bytes.Contains(popular.Body.Bytes(), []byte(sharedID)) || bytes.Contains(popular.Body.Bytes(), []byte(privateID)) {
 		t.Fatalf("popular=%d %s", popular.Code, popular.Body.String())
@@ -166,6 +169,24 @@ func TestPlaybackAuthorizationAndLearningIsolation(t *testing.T) {
 	analytics := learningResponse(mux, learningRequest(t, http.MethodGet, "/api/analytics?period=30", nil, instructor))
 	if analytics.Code != http.StatusOK || !bytes.Contains(analytics.Body.Bytes(), []byte(`"active_learners":1`)) || bytes.Contains(analytics.Body.Bytes(), []byte("First user's note")) {
 		t.Fatalf("analytics=%d %s", analytics.Code, analytics.Body.String())
+	}
+	var analyticsPayload struct {
+		Analytics AnalyticsResult `json:"analytics"`
+	}
+	if err = json.Unmarshal(analytics.Body.Bytes(), &analyticsPayload); err != nil {
+		t.Fatal(err)
+	}
+	if len(analyticsPayload.Analytics.Activity) != 30 {
+		t.Fatalf("analytics activity days=%d", len(analyticsPayload.Analytics.Activity))
+	}
+	var noteOnlyMemberActive bool
+	for _, member := range analyticsPayload.Analytics.Members {
+		if member.UserID == second.id {
+			noteOnlyMemberActive = member.LastActiveAt != nil
+		}
+	}
+	if !noteOnlyMemberActive {
+		t.Fatal("note-only member was not marked active")
 	}
 	if response := learningResponse(mux, learningRequest(t, http.MethodGet, "/api/analytics?organization_id=00000000-0000-0000-0000-000000000000", nil, instructor)); response.Code != http.StatusNotFound {
 		t.Fatalf("instructor cross-gym analytics=%d", response.Code)
