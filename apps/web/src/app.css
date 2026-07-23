@@ -237,8 +237,9 @@ td small { margin-top: .2rem; }
 .status-message.success { border-color: var(--success); color: #b8d0b6; }
 .status-message button { width: 27px; min-height: 27px; height: 27px; border: 0; padding: 0; color: inherit; background: transparent; }
 
-.login-page { display: grid; min-height: 100vh; place-items: center; padding: 2rem; background: var(--bg); }
-.login-card { width: min(390px, 100%); min-width: 0; padding: 2.25rem; border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface); }
+.login-page { position: relative; isolation: isolate; display: grid; min-height: 100vh; place-items: center; overflow: hidden; padding: 2rem; background: var(--bg); }
+.login-page::before { position: absolute; z-index: -1; inset: 0; background: url("/gi-weave.svg") repeat; content: ""; opacity: .72; }
+.login-card { width: min(390px, 100%); min-width: 0; padding: 2.25rem; border: 1px solid var(--border); border-radius: var(--radius); background: rgba(20,20,22,.96); }
 .login-card .wordmark { padding: 0; }
 .login-heading { margin-top: 3.75rem; }
 .login-heading h1 { margin-bottom: .45rem; font-size: 1.8rem; letter-spacing: -.04em; }
