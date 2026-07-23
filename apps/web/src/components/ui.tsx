@@ -74,6 +74,12 @@ export function Visibility({ value }: { value: Video['visibility'] }) {
   </span>
 }
 
+export function BookmarkIcon({ filled = false }: { filled?: boolean }) {
+  return <svg className="bookmark-icon" viewBox="0 0 20 20" aria-hidden="true">
+    <path d="M5.5 3.5h9v13L10 13.6l-4.5 2.9v-13Z" fill={filled ? 'currentColor' : 'none'} />
+  </svg>
+}
+
 export function Filter({ label, value, options, onChange }: { label: string; value: string; options: string[]; onChange: (value: string) => void }) {
   return <label>
     <span className="sr-only">{label}</span>

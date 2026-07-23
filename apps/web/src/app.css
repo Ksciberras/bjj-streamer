@@ -154,8 +154,13 @@ input[type="file"]::file-selector-button { margin-right: .75rem; border: 1px sol
 .video-card-body small { display: block; min-height: 1rem; font-size: .7rem; line-height: 1.4; }
 .video-card-context { display: block; margin: .15rem 0 .45rem; color: var(--accent-hover); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .64rem; }
 .home-section-context { color: var(--subtle); font-size: .66rem; }
-.card-action { display: flex; width: 100%; min-height: 0; justify-content: space-between; margin-top: .9rem; padding: .65rem 0 0; border: 0; border-top: 1px solid var(--border); border-radius: 0; color: var(--accent); background: transparent; font-size: .74rem; }
-.card-action:hover { color: var(--accent-hover); background: transparent; }
+.video-card-actions { display: flex; align-items: stretch; gap: .5rem; margin-top: .9rem; padding-top: .7rem; border-top: 1px solid var(--border); }
+.card-action { display: flex; min-width: 0; min-height: 34px; flex: 1; justify-content: space-between; margin: 0; padding: .45rem .55rem; border-color: transparent; color: var(--text); background: var(--surface-subtle); font-size: .72rem; }
+.card-action:hover { color: var(--text); border-color: #5a3432; background: var(--surface-hover); }
+.bookmark-icon { width: 17px; height: 17px; fill: none; stroke: currentColor; stroke-width: 1.45; stroke-linecap: round; stroke-linejoin: round; }
+.bookmark-button { display: grid; width: 36px; min-height: 34px; flex: 0 0 auto; place-items: center; padding: 0; color: var(--muted); background: transparent; }
+.bookmark-button:hover { color: var(--text); border-color: var(--accent); background: var(--accent-dark); }
+.bookmark-button.saved { color: var(--accent-hover); border-color: #6b3532; background: var(--accent-dark); }
 .browse-list { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: .65rem; }
 .browse-list button { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: .75rem; padding: .75rem; border-color: var(--border); color: var(--text); background: var(--surface); text-align: left; }
 .browse-list button:hover { border-color: var(--border-strong); background: var(--surface-subtle); }
@@ -186,6 +191,10 @@ input[type="file"]::file-selector-button { margin-right: .75rem; border: 1px sol
 .editorial-label { display: block; margin-bottom: .45rem; color: var(--accent-hover); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .61rem; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; }
 .player-heading h1 { margin: 0 0 .3rem; font-size: clamp(1.5rem, 3vw, 2.35rem); letter-spacing: -.04em; }
 .player-heading p { margin: 0; font-size: .8rem; }
+.player-heading-actions { display: grid; justify-items: end; gap: .65rem; }
+.player-bookmark { display: inline-flex; width: auto; min-height: 36px; align-items: center; gap: .45rem; padding: .45rem .65rem; color: var(--muted); background: var(--surface); font-size: .68rem; }
+.player-bookmark:hover { color: var(--text); border-color: var(--accent); background: var(--accent-dark); }
+.player-bookmark.saved { color: var(--accent-hover); border-color: #6b3532; background: var(--accent-dark); }
 .player-frame { position: relative; display: grid; width: 100%; aspect-ratio: 16 / 9; place-items: center; overflow: hidden; border: 1px solid #4a3332; border-radius: 8px; background: #030304; box-shadow: 0 20px 55px rgba(0,0,0,.32); }
 .player-frame video { display: block; width: 100%; height: 100%; object-fit: contain; background: #000; }
 .player-loading { display: grid; place-items: center; gap: .4rem; color: var(--muted); text-align: center; }
@@ -875,16 +884,6 @@ td small { margin-top: .2rem; }
   }
 }
 
-.watch-later-player {
-  width: auto;
-  margin: 0;
-}
-
-.save-later {
-  align-self: flex-start;
-  margin-top: .25rem;
-}
-
 .saved-video-list,
 .study-note-list {
   display: grid;
@@ -1125,10 +1124,8 @@ td small { margin-top: .2rem; }
 
 @media (max-width: 640px) {
   .study-toolbar { align-items: stretch; flex-direction: column; }
-  .watch-later-player {
-    width: 100%;
-    margin: 0;
-  }
+  .player-heading { align-items: flex-start; flex-direction: column; }
+  .player-heading-actions { width: 100%; grid-auto-flow: column; align-items: center; justify-content: space-between; justify-items: start; }
 
   .saved-video-list article {
     grid-template-columns: 72px minmax(0, 1fr);

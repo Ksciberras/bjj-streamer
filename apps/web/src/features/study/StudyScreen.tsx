@@ -1,5 +1,5 @@
 import { type FormEvent, useEffect, useMemo, useRef, useState } from 'react'
-import { EmptyState, ErrorState, Visibility } from '../../components/ui'
+import { BookmarkIcon, EmptyState, ErrorState, Visibility } from '../../components/ui'
 import { api, errorMessage } from '../../lib/api'
 import { formatTime } from '../../lib/format'
 import type { Course, CourseVideo, Note, Video } from '../../types'
@@ -205,9 +205,6 @@ export function StudyScreen({ video, course, autoPlay, initialSeek, savedForLate
     <div className="screen study-screen">
       <div className="study-toolbar">
         <button className="back-button" onClick={() => void back()}>← Back to library</button>
-        <button className="secondary-button watch-later-player" type="button" onClick={onToggleWatchLater}>
-          {savedForLater ? 'Remove from Watch later' : 'Save to Watch later'}
-        </button>
       </div>
       <div className="study-layout">
         <Player
@@ -220,6 +217,8 @@ export function StudyScreen({ video, course, autoPlay, initialSeek, savedForLate
           onPause={saveProgress}
           onEnded={advance}
           autoplayBlocked={autoplayBlocked}
+          savedForLater={savedForLater}
+          onToggleWatchLater={onToggleWatchLater}
           onResumeAutoplay={() => {
             setAutoplayBlocked(false)
             void player.current?.play()
@@ -263,9 +262,11 @@ type PlayerProps = {
   onEnded: () => Promise<void>
   autoplayBlocked: boolean
   onResumeAutoplay: () => void
+  savedForLater: boolean
+  onToggleWatchLater: () => void
 }
 
-function Player({ video, player, url, loading, resumeAt, onTimeUpdate, onPause, onEnded, autoplayBlocked, onResumeAutoplay }: PlayerProps) {
+function Player({ video, player, url, loading, resumeAt, onTimeUpdate, onPause, onEnded, autoplayBlocked, onResumeAutoplay, savedForLater, onToggleWatchLater }: PlayerProps) {
   return (
     <section className="player-column" aria-labelledby="video-title">
       <header className="player-heading">
@@ -274,7 +275,13 @@ function Player({ video, player, url, loading, resumeAt, onTimeUpdate, onPause, 
           <h1 id="video-title">{video.title}</h1>
           <p>{video.instructor_name}{video.chapter_name ? ` · ${video.chapter_name}` : ''}</p>
         </div>
-        <Visibility value={video.visibility} />
+        <div className="player-heading-actions">
+          <Visibility value={video.visibility} />
+          <button type="button" className={`player-bookmark${savedForLater ? ' saved' : ''}`} onClick={onToggleWatchLater}>
+            <BookmarkIcon filled={savedForLater} />
+            <span>{savedForLater ? 'Saved' : 'Watch later'}</span>
+          </button>
+        </div>
       </header>
       <div className="player-frame">
         {loading

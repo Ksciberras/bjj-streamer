@@ -1,5 +1,5 @@
 import { type FormEvent, useState } from 'react'
-import { EmptyState, Filter, LoadingSkeleton, PageHeader, SectionHeading, Visibility } from '../../components/ui'
+import { BookmarkIcon, EmptyState, Filter, LoadingSkeleton, PageHeader, SectionHeading, Visibility } from '../../components/ui'
 import { formatTime, initials } from '../../lib/format'
 import type { CourseSummary, PopularVideo, ProgressMap, Video } from '../../types'
 
@@ -174,8 +174,15 @@ function VideoCard({ video, savedAt = 0, savedForLater = false, context, onToggl
       <p>{video.instructor_name}</p>
       {context && <span className="video-card-context">{context}</span>}
       {(video.instructional_name || video.chapter_name) && <small>{[video.instructional_name, video.chapter_name].filter(Boolean).join(' · ')}</small>}
-      <button className="card-action" onClick={onOpen}>{savedAt > 0 ? 'Resume' : 'Study video'} <span aria-hidden="true">→</span></button>
-      {onToggleWatchLater && <button className="text-button save-later" onClick={onToggleWatchLater}>{savedForLater ? 'Saved for later' : 'Watch later'}</button>}
+      <div className="video-card-actions">
+        <button className="card-action" onClick={onOpen}>{savedAt > 0 ? 'Resume' : 'Study'} <span aria-hidden="true">→</span></button>
+        {onToggleWatchLater && <button
+          className={`bookmark-button${savedForLater ? ' saved' : ''}`}
+          onClick={onToggleWatchLater}
+          aria-label={savedForLater ? `Remove ${video.title} from Watch later` : `Save ${video.title} to Watch later`}
+          title={savedForLater ? 'Remove from Watch later' : 'Save to Watch later'}
+        ><BookmarkIcon filled={savedForLater} /></button>}
+      </div>
     </div>
   </article>
 }
