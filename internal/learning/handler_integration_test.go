@@ -94,8 +94,17 @@ func TestPlaybackAuthorizationAndLearningIsolation(t *testing.T) {
 	instructor := newLearner(t, pool, "instructor@example.com", "instructor")
 	first := newLearner(t, pool, "first@example.com", "student")
 	second := newLearner(t, pool, "second@example.com", "student")
+	platformOwner := newLearner(t, pool, "owner@example.com", "admin")
+	if _, err := pool.Exec(context.Background(), `UPDATE users SET is_platform_owner=TRUE,organization_id=NULL WHERE id=$1`, platformOwner.id); err != nil {
+		t.Fatal(err)
+	}
 	sharedID := readyVideo(t, pool, instructor, "shared")
 	privateID := readyVideo(t, pool, instructor, "private")
+	var ownerOnlyID string
+	if err := pool.QueryRow(context.Background(), `INSERT INTO videos(uploaded_by_user_id,title,instructor_name,visibility,content_basis,object_key,original_filename,mime_type,byte_size,status)
+		VALUES($1,'Platform-only activity','Coach','shared','self_created','owner-only.mp4','owner-only.mp4','video/mp4',10,'ready') RETURNING id`, instructor.id).Scan(&ownerOnlyID); err != nil {
+		t.Fatal(err)
+	}
 	authHandler, err := auth.NewHandler(auth.NewStore(pool), auth.Settings{SessionIdleTTL: time.Hour, SessionAbsoluteTTL: 24 * time.Hour}, 100)
 	if err != nil {
 		t.Fatal(err)
@@ -159,8 +168,14 @@ func TestPlaybackAuthorizationAndLearningIsolation(t *testing.T) {
 	if _, err = NewStore(pool).CreateNote(context.Background(), second.id, sharedID, 18, "Second user's private note"); err != nil {
 		t.Fatal(err)
 	}
+	if err = NewStore(pool).RecordEvent(context.Background(), platformOwner.id, ownerOnlyID, "started", 0); err != nil {
+		t.Fatal(err)
+	}
+	if _, err = NewStore(pool).CreateNote(context.Background(), platformOwner.id, ownerOnlyID, 12, "Platform activity"); err != nil {
+		t.Fatal(err)
+	}
 	popular := learningResponse(mux, learningRequest(t, http.MethodGet, "/api/popular", nil, first))
-	if popular.Code != http.StatusOK || !bytes.Contains(popular.Body.Bytes(), []byte(sharedID)) || bytes.Contains(popular.Body.Bytes(), []byte(privateID)) {
+	if popular.Code != http.StatusOK || !bytes.Contains(popular.Body.Bytes(), []byte(sharedID)) || bytes.Contains(popular.Body.Bytes(), []byte(privateID)) || bytes.Contains(popular.Body.Bytes(), []byte(ownerOnlyID)) {
 		t.Fatalf("popular=%d %s", popular.Code, popular.Body.String())
 	}
 	if response := learningResponse(mux, learningRequest(t, http.MethodGet, "/api/analytics?period=30", nil, first)); response.Code != http.StatusNotFound {
@@ -179,14 +194,30 @@ func TestPlaybackAuthorizationAndLearningIsolation(t *testing.T) {
 	if len(analyticsPayload.Analytics.Activity) != 30 {
 		t.Fatalf("analytics activity days=%d", len(analyticsPayload.Analytics.Activity))
 	}
+	if analyticsPayload.Analytics.Overview.ActiveLearners != 1 ||
+		analyticsPayload.Analytics.Overview.VideosStarted != 1 ||
+		analyticsPayload.Analytics.Overview.NotesCreated != 2 {
+		t.Fatalf("platform activity included in overview: %+v", analyticsPayload.Analytics.Overview)
+	}
 	var noteOnlyMemberActive bool
+	var ownerIncluded bool
+	var ownerOnlyViewers int
 	for _, member := range analyticsPayload.Analytics.Members {
 		if member.UserID == second.id {
 			noteOnlyMemberActive = member.LastActiveAt != nil
 		}
+		ownerIncluded = ownerIncluded || member.UserID == platformOwner.id
+	}
+	for _, content := range analyticsPayload.Analytics.Content {
+		if content.VideoID == ownerOnlyID {
+			ownerOnlyViewers = content.Viewers
+		}
 	}
 	if !noteOnlyMemberActive {
 		t.Fatal("note-only member was not marked active")
+	}
+	if ownerIncluded || ownerOnlyViewers != 0 {
+		t.Fatalf("platform activity included in details: owner_member=%t owner_only_viewers=%d", ownerIncluded, ownerOnlyViewers)
 	}
 	if response := learningResponse(mux, learningRequest(t, http.MethodGet, "/api/analytics?organization_id=00000000-0000-0000-0000-000000000000", nil, instructor)); response.Code != http.StatusNotFound {
 		t.Fatalf("instructor cross-gym analytics=%d", response.Code)

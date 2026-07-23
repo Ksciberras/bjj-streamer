@@ -98,13 +98,14 @@ func (s *Store) RecordEvent(ctx context.Context, userID, videoID, eventType stri
 }
 
 func (s *Store) PopularVideos(ctx context.Context, organizationID *string, platformOwner bool) ([]PopularVideo, error) {
-	rows, err := s.db.Query(ctx, `SELECT video_id,COUNT(DISTINCT user_id)
-		FROM learning_events
+	rows, err := s.db.Query(ctx, `SELECT le.video_id,COUNT(DISTINCT le.user_id)
+		FROM learning_events le
+		JOIN users u ON u.id=le.user_id AND NOT u.is_platform_owner
 		WHERE occurred_at >= CURRENT_TIMESTAMP - INTERVAL '30 days'
 			AND event_type IN ('started','resumed')
-			AND ($2 OR organization_id=$1)
-		GROUP BY video_id
-		ORDER BY COUNT(DISTINCT user_id) DESC,MAX(occurred_at) DESC,video_id
+			AND ($2 OR le.organization_id=$1)
+		GROUP BY le.video_id
+		ORDER BY COUNT(DISTINCT le.user_id) DESC,MAX(le.occurred_at) DESC,le.video_id
 		LIMIT 20`, organizationID, platformOwner)
 	if err != nil {
 		return nil, err
@@ -128,8 +129,8 @@ func (s *Store) Analytics(ctx context.Context, organizationID *string, platformO
 		COUNT(DISTINCT le.user_id),
 		COUNT(DISTINCT (le.user_id,le.video_id)) FILTER (WHERE le.event_type IN ('started','resumed')),
 		COUNT(*) FILTER (WHERE le.event_type='resumed'),
-		(SELECT COUNT(*) FROM notes n JOIN users nu ON nu.id=n.user_id WHERE n.created_at >= $3 AND ($2 OR nu.organization_id=$1))
-		FROM learning_events le
+		(SELECT COUNT(*) FROM notes n JOIN users nu ON nu.id=n.user_id WHERE NOT nu.is_platform_owner AND n.created_at >= $3 AND ($2 OR nu.organization_id=$1))
+		FROM learning_events le JOIN users lu ON lu.id=le.user_id AND NOT lu.is_platform_owner
 		WHERE le.occurred_at >= $3 AND ($2 OR le.organization_id=$1)`,
 		organizationID, platformOwner, since).Scan(
 		&result.Overview.ActiveLearners, &result.Overview.VideosStarted,
@@ -142,14 +143,14 @@ func (s *Store) Analytics(ctx context.Context, organizationID *string, platformO
 		),
 		event_activity AS (
 			SELECT occurred_at::date AS day,COUNT(DISTINCT user_id) AS active_learners,COUNT(*) AS study_actions
-			FROM learning_events
-			WHERE occurred_at >= $3 AND ($2 OR organization_id=$1)
-			GROUP BY occurred_at::date
+			FROM learning_events le JOIN users u ON u.id=le.user_id AND NOT u.is_platform_owner
+			WHERE le.occurred_at >= $3 AND ($2 OR le.organization_id=$1)
+			GROUP BY le.occurred_at::date
 		),
 		note_activity AS (
 			SELECT n.created_at::date AS day,COUNT(*) AS notes_created
 			FROM notes n JOIN users u ON u.id=n.user_id
-			WHERE n.created_at >= $3 AND ($2 OR u.organization_id=$1)
+			WHERE NOT u.is_platform_owner AND n.created_at >= $3 AND ($2 OR u.organization_id=$1)
 			GROUP BY n.created_at::date
 		)
 		SELECT d.day,COALESCE(e.active_learners,0),COALESCE(e.study_actions,0),COALESCE(n.notes_created,0)
@@ -178,9 +179,10 @@ func (s *Store) Analytics(ctx context.Context, organizationID *string, platformO
 		COUNT(*) FILTER (WHERE le.event_type='started'),
 		COUNT(*) FILTER (WHERE le.event_type='resumed'),
 		COUNT(*) FILTER (WHERE le.event_type='completed'),
-		(SELECT COUNT(*) FROM notes n JOIN users nu ON nu.id=n.user_id WHERE n.video_id=v.id AND n.created_at >= $3 AND ($2 OR nu.organization_id=$1))
+		(SELECT COUNT(*) FROM notes n JOIN users nu ON nu.id=n.user_id WHERE NOT nu.is_platform_owner AND n.video_id=v.id AND n.created_at >= $3 AND ($2 OR nu.organization_id=$1))
 		FROM videos v
 		LEFT JOIN learning_events le ON le.video_id=v.id AND le.occurred_at >= $3 AND ($2 OR le.organization_id=$1)
+			AND EXISTS(SELECT 1 FROM users lu WHERE lu.id=le.user_id AND NOT lu.is_platform_owner)
 		WHERE v.status='ready' AND ($2 OR EXISTS(SELECT 1 FROM video_organizations vo WHERE vo.video_id=v.id AND vo.organization_id=$1))
 		GROUP BY v.id ORDER BY COUNT(DISTINCT le.user_id) DESC,v.title LIMIT 50`,
 		organizationID, platformOwner, since)
