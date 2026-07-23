@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from 'react'
-import { PageHeader, WorkspaceTabs } from '../../components/ui'
+import { PageHeader, TruncatedText, WorkspaceTabs } from '../../components/ui'
 import { errorMessage } from '../../lib/api'
 import { formatBytes } from '../../lib/format'
 import { generateVideoThumbnail } from '../../lib/videoThumbnail'
@@ -140,7 +140,7 @@ export function UploadScreen({
               </label>
               {file && (
                 <div className="file-summary">
-                  <strong>{file.name}</strong>
+                  <strong><TruncatedText text={file.name} /></strong>
                   <span>{formatBytes(file.size)} · MP4</span>
                 </div>
               )}
@@ -168,7 +168,7 @@ export function UploadScreen({
                   <div className="thumbnail-summary">
                     <span aria-hidden="true">IMG</span>
                     <div>
-                      <strong>{thumbnail.name}</strong>
+                      <strong><TruncatedText text={thumbnail.name} /></strong>
                       <span>{formatBytes(thumbnail.size)} · Custom thumbnail</span>
                     </div>
                   </div>

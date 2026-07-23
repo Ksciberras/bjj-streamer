@@ -1,4 +1,5 @@
 import { useState, type FormEvent } from 'react'
+import { TruncatedText } from '../../components/ui'
 import { api, errorMessage } from '../../lib/api'
 import { initials } from '../../lib/format'
 import type { Course, Video } from '../../types'
@@ -108,6 +109,7 @@ export function CourseBuilder({ videos, course, onComplete, onError, onCancel }:
                     key={video.id}
                     type="button"
                     className={`course-pick-card${isSelected ? ' selected' : ''}`}
+                    title={`${video.title} — ${video.instructor_name}`}
                     aria-pressed={isSelected}
                     disabled={saving}
                     onClick={() => toggle(video)}
@@ -119,9 +121,9 @@ export function CourseBuilder({ videos, course, onComplete, onError, onCancel }:
                       <span className="course-pick-state">{isSelected ? 'Selected' : 'Add'}</span>
                     </span>
                     <span className="course-pick-copy">
-                      <strong>{video.title}</strong>
-                      <small>{video.instructor_name}</small>
-                      {(video.instructional_name || video.chapter_name) && <span>{[video.instructional_name, video.chapter_name].filter(Boolean).join(' · ')}</span>}
+                      <strong><TruncatedText text={video.title} focusable={false} /></strong>
+                      <small><TruncatedText text={video.instructor_name} focusable={false} /></small>
+                      {(video.instructional_name || video.chapter_name) && <TruncatedText text={[video.instructional_name, video.chapter_name].filter(Boolean).join(' · ')} focusable={false} />}
                     </span>
                   </button>
                 )
@@ -136,7 +138,7 @@ export function CourseBuilder({ videos, course, onComplete, onError, onCancel }:
               {selected.map((video, index) => (
                 <li key={video.id}>
                   <span className="queue-order">{String(index + 1).padStart(2, '0')}</span>
-                  <span><strong>{video.title}</strong><small>{video.instructor_name}</small></span>
+                  <span><strong><TruncatedText text={video.title} /></strong><small><TruncatedText text={video.instructor_name} /></small></span>
                   <span className="course-order-actions">
                     <button type="button" className="secondary-button" disabled={saving || index === 0} aria-label={`Move ${video.title} earlier`} onClick={() => move(index, -1)}>↑</button>
                     <button type="button" className="secondary-button" disabled={saving || index === selected.length - 1} aria-label={`Move ${video.title} later`} onClick={() => move(index, 1)}>↓</button>

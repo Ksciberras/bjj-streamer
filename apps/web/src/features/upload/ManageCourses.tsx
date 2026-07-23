@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { EmptyState, SectionHeading } from '../../components/ui'
+import { EmptyState, SectionHeading, TruncatedText } from '../../components/ui'
 import { api, errorMessage } from '../../lib/api'
 import type { Course, CourseSummary } from '../../types'
 
@@ -46,8 +46,8 @@ export function ManageCourses({ courses, onEdit, onUpdate, onError }: ManageCour
           {courses.map((course) => (
             <article key={course.id} className="manage-course-row">
               <div>
-                <strong>{course.title}</strong>
-                <span>{course.instructor_name} · {course.video_count} {course.video_count === 1 ? 'chapter' : 'chapters'}</span>
+                <strong><TruncatedText text={course.title} /></strong>
+                <TruncatedText text={`${course.instructor_name} · ${course.video_count} ${course.video_count === 1 ? 'chapter' : 'chapters'}`} />
               </div>
               <div className="manage-row-actions">
                 <button type="button" className="secondary-button" disabled={busyID === course.id} onClick={() => void edit(course)}>Edit</button>

@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from 'react'
-import { Dialog, PageHeader, SectionHeading, WorkspaceTabs } from '../../components/ui'
+import { Dialog, PageHeader, SectionHeading, TruncatedText, WorkspaceTabs } from '../../components/ui'
 import { api, errorMessage } from '../../lib/api'
 import type { CourseSummary, Organization, User, Video } from '../../types'
 import { PlatformGyms } from './PlatformGyms'
@@ -144,7 +144,7 @@ export function AdminScreen({
               {users.map((item) => (
                 <tr key={item.id}>
                   <td>
-                    <strong>{item.email}</strong>
+                    <strong><TruncatedText text={item.email} /></strong>
                     {item.is_platform_owner && <small className="platform-owner-label">Platform owner</small>}
                   </td>
                   <td>
@@ -155,7 +155,7 @@ export function AdminScreen({
                       {item.is_platform_owner
                         ? <span className="platform-scope">All gyms</span>
                         : (
-                          <span className="table-value">{organizations.find((organization) => organization.id === item.organization_id)?.name ?? 'Unassigned'}</span>
+                          <TruncatedText className="table-value" text={organizations.find((organization) => organization.id === item.organization_id)?.name ?? 'Unassigned'} />
                         )}
                     </td>
                   )}

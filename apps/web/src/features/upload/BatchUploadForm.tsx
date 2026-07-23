@@ -1,4 +1,5 @@
 import { useState, type FormEvent } from 'react'
+import { TruncatedText } from '../../components/ui'
 import { api, errorMessage } from '../../lib/api'
 import { formatBytes } from '../../lib/format'
 import { generateVideoThumbnail } from '../../lib/videoThumbnail'
@@ -169,7 +170,7 @@ export function BatchUploadForm({ onComplete, onError }: BatchUploadFormProps) {
                   disabled={running}
                   onChange={(event) => update(item.id, { title: event.target.value })}
                 />
-                <small>{item.file.name} · {formatBytes(item.file.size)}</small>
+                <small><TruncatedText text={`${item.file.name} · ${formatBytes(item.file.size)}`} /></small>
                 {item.status === 'uploading' && (
                   <div className="progress-track" role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={item.progress}>
                     <span style={{ width: `${item.progress}%` }} />

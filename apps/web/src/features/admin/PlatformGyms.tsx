@@ -1,5 +1,5 @@
 import { useEffect, useState, type FormEvent } from 'react'
-import { SectionHeading } from '../../components/ui'
+import { SectionHeading, TruncatedText } from '../../components/ui'
 import { api, errorMessage } from '../../lib/api'
 import type { CourseSummary, Organization, Video } from '../../types'
 
@@ -84,8 +84,8 @@ export function PlatformGyms(props: PlatformGymsProps) {
       </form>
       <div className="gym-directory">
         {organizations.map((organization) => <article className="surface" key={organization.id}>
-          <strong>{organization.name}</strong>
-          <span>{organization.slug}</span>
+          <strong><TruncatedText text={organization.name} /></strong>
+          <TruncatedText text={organization.slug} />
         </article>)}
       </div>
       </> : <>
@@ -98,7 +98,7 @@ export function PlatformGyms(props: PlatformGymsProps) {
       {organizations.map((organization) => (
         <details className="surface gym-access" key={organization.id}>
           <summary>
-            <span><strong>{organization.name}</strong><small>{organization.slug}</small></span>
+            <span><strong><TruncatedText text={organization.name} /></strong><small><TruncatedText text={organization.slug} /></small></span>
             <span>Manage access</span>
           </summary>
           <div className="availability-grid">
@@ -112,7 +112,7 @@ export function PlatformGyms(props: PlatformGymsProps) {
                     onChange={(event) =>
                       void toggle('videos', video.id, organization.id, event.target.checked)}
                   />
-                  {video.title}
+                  <TruncatedText text={video.title} />
                 </label>
               )) : <p>No videos uploaded.</p>}
             </div>
@@ -126,7 +126,7 @@ export function PlatformGyms(props: PlatformGymsProps) {
                     onChange={(event) =>
                       void toggle('courses', course.id, organization.id, event.target.checked)}
                   />
-                  {course.title}
+                  <TruncatedText text={course.title} />
                 </label>
               )) : <p>No courses created.</p>}
             </div>

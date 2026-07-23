@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from 'react'
-import { Dialog, EmptyState, SectionHeading } from '../../components/ui'
+import { Dialog, EmptyState, SectionHeading, TruncatedText } from '../../components/ui'
 import { api, errorMessage } from '../../lib/api'
 import { labelize } from '../../lib/format'
 import { uploadToStorage } from '../../lib/objectUpload'
@@ -95,8 +95,8 @@ export function ManageVideos({ videos, onUpdate, onError }: ManageVideosProps) {
                       ? <img src={video.thumbnail_url} alt="" loading="lazy" />
                       : <span aria-hidden="true" />}
                     <div>
-                      <strong>{video.title}</strong>
-                      <small>{video.instructor_name}</small>
+                      <strong><TruncatedText text={video.title} /></strong>
+                      <small><TruncatedText text={video.instructor_name} /></small>
                     </div>
                   </div>
                 </td>

@@ -24,6 +24,18 @@ export function SectionHeading({ id, title, action }: { id?: string; title: stri
   </div>
 }
 
+export function TruncatedText({ text, className = '', focusable = true }: { text: string; className?: string; focusable?: boolean }) {
+  return (
+    <span
+      className={`truncate-tooltip${className ? ` ${className}` : ''}`}
+      data-tooltip={text}
+      tabIndex={focusable ? 0 : undefined}
+    >
+      <span>{text}</span>
+    </span>
+  )
+}
+
 export function WorkspaceTabs<T extends string>({ label, value, items, onChange }: { label: string; value: T; items: Array<{ id: T; label: string; count?: number }>; onChange: (value: T) => void }) {
   return <div className="workspace-tabs" role="tablist" aria-label={label}>
     {items.map((item) => <button
@@ -61,7 +73,7 @@ export function Dialog({ title, description, onClose, children }: { title: strin
     }}
   >
     <div className="dialog-header">
-      <div><h2 id={titleID}>{title}</h2>{description && <p>{description}</p>}</div>
+      <div><h2 id={titleID}>{title}</h2>{description && <p><TruncatedText text={description} /></p>}</div>
       <button type="button" className="dialog-close" aria-label="Close dialog" onClick={onClose}>×</button>
     </div>
     <div className="dialog-body">{children}</div>

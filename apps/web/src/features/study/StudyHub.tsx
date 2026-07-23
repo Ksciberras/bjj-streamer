@@ -1,4 +1,4 @@
-import { EmptyState, PageHeader, SectionHeading } from '../../components/ui'
+import { EmptyState, PageHeader, SectionHeading, TruncatedText } from '../../components/ui'
 import { formatTime } from '../../lib/format'
 import type { StudyNote, Video } from '../../types'
 
@@ -22,7 +22,7 @@ export function StudyHub({ watchLater, notes, onOpenVideo, onRemoveWatchLater }:
                 {video.thumbnail_url
                   ? <img src={video.thumbnail_url} alt="" />
                   : <span className="saved-video-placeholder" aria-hidden="true" />}
-                <div><strong>{video.title}</strong><span>{video.instructor_name}</span></div>
+                <div><strong><TruncatedText text={video.title} /></strong><TruncatedText text={video.instructor_name} /></div>
                 <button onClick={() => onOpenVideo(video)}>Study video</button>
                 <button className="secondary-button" onClick={() => onRemoveWatchLater(video)}>Remove</button>
               </article>
@@ -37,9 +37,9 @@ export function StudyHub({ watchLater, notes, onOpenVideo, onRemoveWatchLater }:
             {notes.map((note) => {
               const video = note.video
               return (
-                <button key={note.id} onClick={() => onOpenVideo(video, note.timestamp_seconds)}>
+                <button key={note.id} title={`${note.video_title} — ${note.instructor_name}`} onClick={() => onOpenVideo(video, note.timestamp_seconds)}>
                   <code>{formatTime(note.timestamp_seconds)}</code>
-                  <span><strong>{note.video_title}</strong><small>{note.instructor_name}</small><p>{note.body}</p></span>
+                  <span><strong><TruncatedText text={note.video_title} focusable={false} /></strong><small><TruncatedText text={note.instructor_name} focusable={false} /></small><p>{note.body}</p></span>
                   <span aria-hidden="true">→</span>
                 </button>
               )

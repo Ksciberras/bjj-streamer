@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react'
 import type { User, View } from '../types'
-import { Wordmark } from './ui'
+import { TruncatedText, Wordmark } from './ui'
 
 type NavigationItem = {
   id: View
@@ -77,8 +77,8 @@ function DesktopAccount({ user, onLogout }: { user: User; onLogout: () => Promis
   return <div className="account">
     <AccountAvatar user={user} />
     <div className="account-copy">
-      <strong>{user.email}</strong>
-      <span>{user.is_platform_owner ? 'Platform owner · All gyms' : `${user.role} · ${user.organization_name ?? 'Gym workspace'}`}</span>
+      <strong><TruncatedText text={user.email} /></strong>
+      <TruncatedText text={user.is_platform_owner ? 'Platform owner · All gyms' : `${user.role} · ${user.organization_name ?? 'Gym workspace'}`} />
     </div>
     <button className="account-action" onClick={() => void onLogout()}>Sign out</button>
   </div>

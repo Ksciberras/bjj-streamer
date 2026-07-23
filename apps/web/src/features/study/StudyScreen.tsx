@@ -1,5 +1,5 @@
 import { type FormEvent, useEffect, useMemo, useRef, useState } from 'react'
-import { BookmarkIcon, EmptyState, ErrorState, Visibility } from '../../components/ui'
+import { BookmarkIcon, EmptyState, ErrorState, TruncatedText, Visibility } from '../../components/ui'
 import { api, errorMessage } from '../../lib/api'
 import { formatTime } from '../../lib/format'
 import type { Course, CourseVideo, Note, Video } from '../../types'
@@ -206,7 +206,10 @@ export function StudyScreen({ video, course, autoPlay, initialSeek, savedForLate
       <div className="study-toolbar">
         <button className="back-button" onClick={() => void back()}>← Back to library</button>
         {course && courseIndex >= 0 && (
-          <span className="study-course-position">{course.title} · {courseIndex + 1} of {course.videos.length}</span>
+          <TruncatedText
+            className="study-course-position"
+            text={`${course.title} · ${courseIndex + 1} of ${course.videos.length}`}
+          />
         )}
       </div>
       <div className="study-layout">
@@ -231,8 +234,8 @@ export function StudyScreen({ video, course, autoPlay, initialSeek, savedForLate
           {course && courseIndex >= 0 && (
             <nav className="course-navigation" aria-label="Course chapters">
               <div className="course-navigation-copy">
-                <span>Up next in {course.title}</span>
-                <strong>{nextVideo?.title ?? 'Course complete'}</strong>
+                <TruncatedText className="course-context" text={`Up next in ${course.title}`} />
+                <strong><TruncatedText text={nextVideo?.title ?? 'Course complete'} /></strong>
               </div>
               <div className="course-navigation-actions">
                 <button type="button" className="secondary-button" disabled={!previousVideo} onClick={() => previousVideo && onSelectCourseVideo(previousVideo)}>← Previous</button>
@@ -298,8 +301,8 @@ function Player({ video, player, url, loading, resumeAt, onTimeUpdate, onPause, 
       <header className="player-heading">
         <div className="player-title-copy">
           <span className="editorial-label">Now studying</span>
-          <h1 id="video-title">{video.title}</h1>
-          <p>{video.instructor_name}{video.chapter_name ? ` · ${video.chapter_name}` : ''}</p>
+          <h1 id="video-title"><TruncatedText text={video.title} /></h1>
+          <p><TruncatedText text={`${video.instructor_name}${video.chapter_name ? ` · ${video.chapter_name}` : ''}`} /></p>
         </div>
         <button
           type="button"

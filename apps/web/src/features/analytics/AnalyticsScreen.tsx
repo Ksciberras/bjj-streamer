@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { EmptyState, PageHeader } from '../../components/ui'
+import { EmptyState, PageHeader, TruncatedText } from '../../components/ui'
 import { api, errorMessage } from '../../lib/api'
 import type { Analytics, Organization } from '../../types'
 
@@ -170,8 +170,8 @@ function MostStudied({ analytics, period }: { analytics: Analytics; period: numb
             <li key={item.video_id}>
               <span className="rank-number">{String(index + 1).padStart(2, '0')}</span>
               <div>
-                <strong>{item.title}</strong>
-                <span>{item.instructor_name}</span>
+                <strong><TruncatedText text={item.title} /></strong>
+                <TruncatedText text={item.instructor_name} />
                 <span className="chart-track"><i style={{ width: `${(item.unique_viewers / maxViewers) * 100}%` }} /></span>
               </div>
               <span className="rank-value"><strong>{item.unique_viewers}</strong> {item.unique_viewers === 1 ? 'learner' : 'learners'}</span>
@@ -227,7 +227,7 @@ function VideoDetails({ analytics }: { analytics: Analytics }) {
         <thead><tr><th>Video</th><th>Viewers</th><th>Starts</th><th>Resumes</th><th>Completed</th><th>Notes</th></tr></thead>
         <tbody>{analytics.content.map((item) => (
           <tr key={item.video_id}>
-            <td><strong>{item.title}</strong><small>{item.instructor_name}</small></td>
+            <td><strong><TruncatedText text={item.title} /></strong><small><TruncatedText text={item.instructor_name} /></small></td>
             <td>{item.unique_viewers}</td><td>{item.starts}</td><td>{item.resumes}</td><td>{item.completions}</td><td>{item.notes}</td>
           </tr>
         ))}</tbody>
@@ -244,8 +244,8 @@ function MemberDetails({ analytics, showOrganization }: { analytics: Analytics; 
         <thead><tr><th>Member</th>{showOrganization && <th>Gym</th>}<th>Last active</th><th>Videos studied</th><th>Notes</th></tr></thead>
         <tbody>{analytics.members.map((item) => (
           <tr key={item.user_id}>
-            <td><strong>{item.email}</strong></td>
-            {showOrganization && <td>{item.organization_name}</td>}
+            <td><strong><TruncatedText text={item.email} /></strong></td>
+            {showOrganization && <td><TruncatedText text={item.organization_name} /></td>}
             <td>{item.last_active_at ? formatActivityDate(item.last_active_at) : 'No activity'}</td>
             <td>{item.videos_started}</td><td>{item.notes}</td>
           </tr>

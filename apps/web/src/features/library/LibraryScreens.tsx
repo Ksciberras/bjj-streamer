@@ -1,5 +1,5 @@
 import { type FormEvent, useState } from 'react'
-import { BookmarkIcon, EmptyState, Filter, LoadingSkeleton, PageHeader, SectionHeading, Visibility } from '../../components/ui'
+import { BookmarkIcon, EmptyState, Filter, LoadingSkeleton, PageHeader, SectionHeading, TruncatedText, Visibility } from '../../components/ui'
 import { formatTime, initials } from '../../lib/format'
 import type { CourseSummary, PopularVideo, ProgressMap, Video } from '../../types'
 
@@ -51,7 +51,7 @@ export function HomeScreen({ videos, popularVideos, popularTitle, progress, load
     </div>
     {instructors.length > 0 && <section className="section" aria-labelledby="instructors-title">
       <SectionHeading id="instructors-title" title="Browse by instructor" />
-      <div className="browse-list">{instructors.map((instructor) => <button key={instructor} onClick={() => browse({ instructor })}><span className="browse-monogram">{initials(instructor)}</span><span>{instructor}</span><span aria-hidden="true">→</span></button>)}</div>
+      <div className="browse-list">{instructors.map((instructor) => <button key={instructor} onClick={() => browse({ instructor })} title={instructor}><span className="browse-monogram">{initials(instructor)}</span><TruncatedText text={instructor} focusable={false} /><span aria-hidden="true">→</span></button>)}</div>
     </section>}
     {tags.length > 0 && <section className="section" aria-labelledby="tags-title">
       <SectionHeading id="tags-title" title="Browse by tag" />
@@ -119,12 +119,12 @@ export function LibraryScreen({ videos, courses = [], progress, loading, initial
         <SectionHeading id="courses-title" title="Courses" />
         <div className="course-grid">
           {courses.map((course) => (
-            <button type="button" className="course-card" key={course.id} onClick={() => openCourse(course)}>
+            <button type="button" className="course-card" key={course.id} title={`${course.title} — ${course.instructor_name}`} onClick={() => openCourse(course)}>
               <span className="course-card-cover">
                 {course.thumbnail_url ? <img src={course.thumbnail_url} alt="" loading="lazy" /> : <span aria-hidden="true">{initials(course.instructor_name)}</span>}
                 <small>{course.video_count} {course.video_count === 1 ? 'chapter' : 'chapters'}</small>
               </span>
-              <span className="course-card-copy"><strong>{course.title}</strong><span>{course.instructor_name}</span><span className="course-card-action">Start course →</span></span>
+              <span className="course-card-copy"><strong><TruncatedText text={course.title} focusable={false} /></strong><TruncatedText text={course.instructor_name} focusable={false} /><span className="course-card-action">Start course →</span></span>
             </button>
           ))}
         </div>
@@ -170,10 +170,10 @@ function VideoCard({ video, savedAt = 0, savedForLater = false, context, onToggl
       {savedAt > 0 && <span className="resume-chip">{formatTime(savedAt)} saved</span>}
     </button>
     <div className="video-card-body">
-      <div className="video-title-row"><h2>{video.title}</h2><Visibility value={video.visibility} /></div>
-      <p>{video.instructor_name}</p>
+      <div className="video-title-row"><h2><TruncatedText text={video.title} /></h2><Visibility value={video.visibility} /></div>
+      <p><TruncatedText text={video.instructor_name} /></p>
       {context && <span className="video-card-context">{context}</span>}
-      {(video.instructional_name || video.chapter_name) && <small>{[video.instructional_name, video.chapter_name].filter(Boolean).join(' · ')}</small>}
+      {(video.instructional_name || video.chapter_name) && <small><TruncatedText text={[video.instructional_name, video.chapter_name].filter(Boolean).join(' · ')} /></small>}
       <div className="video-card-actions">
         <button className="card-action" onClick={onOpen}>{savedAt > 0 ? 'Resume' : 'Study'} <span aria-hidden="true">→</span></button>
         {onToggleWatchLater && <button
@@ -192,8 +192,8 @@ function ContinueCard({ video, savedAt, onResume }: { video: Video; savedAt: num
     <button className="continue-cover" onClick={onResume} aria-label={`Resume ${video.title}`}><VideoPlaceholder video={video} label="Continue watching" /></button>
     <div className="continue-copy">
       <Visibility value={video.visibility} />
-      <h2>{video.title}</h2>
-      <p>{video.instructor_name}{video.instructional_name ? ` · ${video.instructional_name}` : ''}{video.chapter_name ? ` · ${video.chapter_name}` : ''}</p>
+      <h2><TruncatedText text={video.title} /></h2>
+      <p><TruncatedText text={`${video.instructor_name}${video.instructional_name ? ` · ${video.instructional_name}` : ''}${video.chapter_name ? ` · ${video.chapter_name}` : ''}`} /></p>
       <div className="saved-position"><span>Saved position</span><strong>{formatTime(savedAt)}</strong></div>
       <button onClick={onResume}>Resume at {formatTime(savedAt)} <span aria-hidden="true">→</span></button>
     </div>
