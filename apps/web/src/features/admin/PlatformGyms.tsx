@@ -8,6 +8,7 @@ type Availability = { videos: Assignment[]; courses: Assignment[] }
 type AssetKind = keyof Availability
 
 type PlatformGymsProps = {
+  mode: 'gyms' | 'access'
   organizations: Organization[]
   videos: Video[]
   courses: CourseSummary[]
@@ -16,14 +17,15 @@ type PlatformGymsProps = {
 }
 
 export function PlatformGyms(props: PlatformGymsProps) {
-  const { organizations, videos, courses, setError, setNotice } = props
+  const { mode, organizations, videos, courses, setError, setNotice } = props
   const [availability, setAvailability] = useState<Availability>({ videos: [], courses: [] })
 
   useEffect(() => {
+    if (mode !== 'access') return
     void api('/api/platform/availability')
       .then(setAvailability)
       .catch((reason) => setError(errorMessage(reason, 'Unable to load availability')))
-  }, [setError])
+  }, [mode, setError])
 
   async function createGym(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -67,7 +69,8 @@ export function PlatformGyms(props: PlatformGymsProps) {
 
   return (
     <section className="section platform-gyms">
-      <SectionHeading title="Gyms" action={<span className="admin-count">{organizations.length} gyms</span>} />
+      <SectionHeading title={mode === 'gyms' ? 'Gyms' : 'Content access'} action={<span className="admin-count">{organizations.length} gyms</span>} />
+      {mode === 'gyms' ? <>
       <form className="gym-create-form surface" onSubmit={createGym}>
         <div>
           <strong>Add a gym</strong>
@@ -79,6 +82,13 @@ export function PlatformGyms(props: PlatformGymsProps) {
           <button>Create gym</button>
         </div>
       </form>
+      <div className="gym-directory">
+        {organizations.map((organization) => <article className="surface" key={organization.id}>
+          <strong>{organization.name}</strong>
+          <span>{organization.slug}</span>
+        </article>)}
+      </div>
+      </> : <>
       <div className="gym-availability-heading">
         <div>
           <h3>Content availability</h3>
@@ -123,6 +133,7 @@ export function PlatformGyms(props: PlatformGymsProps) {
           </div>
         </details>
       ))}
+      </>}
     </section>
   )
 }

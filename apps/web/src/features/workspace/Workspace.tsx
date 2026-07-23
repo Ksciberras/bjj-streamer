@@ -269,7 +269,6 @@ export function Workspace({ user, logout }: WorkspaceProps) {
           organizations={organizations}
           platformOwner={Boolean(user.is_platform_owner)}
           onRefreshUsers={refreshUsers}
-          onRefreshVideos={refreshVideos}
           setError={setError}
           setNotice={setNotice}
         />

@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from 'react'
-import { PageHeader } from '../../components/ui'
+import { PageHeader, WorkspaceTabs } from '../../components/ui'
 import { errorMessage } from '../../lib/api'
 import { formatBytes } from '../../lib/format'
 import { generateVideoThumbnail } from '../../lib/videoThumbnail'
@@ -31,7 +31,8 @@ export function UploadScreen({
   const [thumbnail, setThumbnail] = useState<File | null>(null)
   const [progress, setProgress] = useState<number | null>(null)
   const [state, setState] = useState<'idle' | 'preparing' | 'uploading' | 'success' | 'error'>('idle')
-  const [mode, setMode] = useState<'single' | 'batch' | 'course'>('single')
+  const [mode, setMode] = useState<'single' | 'batch'>('single')
+  const [workspace, setWorkspace] = useState<'upload' | 'courses' | 'videos'>('upload')
   const [editingCourse, setEditingCourse] = useState<Course | undefined>()
 
   async function upload(event: FormEvent<HTMLFormElement>) {
@@ -94,38 +95,35 @@ export function UploadScreen({
   return (
     <div className="screen">
       <PageHeader
-        title="Upload MP4"
-        description={mode === 'batch'
-          ? 'Add a complete instructional course with shared metadata.'
-          : mode === 'course'
-            ? 'Arrange your uploaded videos into an ordered course.'
-            : 'Add one browser-compatible MP4 to the library.'}
+        title={workspace === 'upload' ? 'Upload' : workspace === 'courses' ? 'Courses' : 'Videos'}
+        description={workspace === 'upload'
+          ? 'Add browser-compatible MP4s directly to your library.'
+          : workspace === 'courses'
+            ? 'Build, order, and maintain instructional courses.'
+            : 'Edit metadata, thumbnails, visibility, or remove videos.'}
+      />
+      <WorkspaceTabs
+        label="Content workspace"
+        value={workspace}
+        items={[
+          { id: 'upload', label: 'Upload' },
+          { id: 'courses', label: 'Courses', count: manageableCourses.length },
+          { id: 'videos', label: 'Videos', count: manageable.length },
+        ]}
+        onChange={(next) => {
+          setWorkspace(next)
+          if (next !== 'courses') setEditingCourse(undefined)
+        }}
       />
       <div className="upload-layout">
-        <section className="surface upload-panel">
+        {workspace === 'upload' && <section className="surface upload-panel">
           <div className="upload-mode" role="group" aria-label="Upload mode">
             <button type="button" className={mode === 'single' ? 'active' : ''} onClick={() => setMode('single')}>Single video</button>
             {user.role === 'admin' && (
               <button type="button" className={mode === 'batch' ? 'active' : ''} onClick={() => setMode('batch')}>Course batch</button>
             )}
-            <button type="button" className={mode === 'course' ? 'active' : ''} onClick={() => {
-              setEditingCourse(undefined)
-              setMode('course')
-            }}>Build from library</button>
           </div>
-          {mode === 'course'
-            ? <CourseBuilder
-                key={editingCourse?.id ?? 'new-course'}
-                videos={manageable}
-                course={editingCourse}
-                onComplete={async () => {
-                  setEditingCourse(undefined)
-                  await onUploaded()
-                }}
-                onCancel={() => setEditingCourse(undefined)}
-                onError={onError}
-              />
-            : mode === 'batch' && user.role === 'admin'
+          {mode === 'batch' && user.role === 'admin'
             ? <BatchUploadForm onComplete={onUploaded} onError={onError} />
             : <form className="upload-form" onSubmit={upload}>
             <div className="form-step">
@@ -216,18 +214,33 @@ export function UploadScreen({
               {state === 'success' && <p className="success-text" role="status">Upload complete. The video is ready.</p>}
             </div>
             </form>}
-        </section>
-        <ManageCourses
+        </section>}
+        {workspace === 'courses' && <div className="course-workspace">
+          <section className="surface upload-panel">
+            <CourseBuilder
+              key={editingCourse?.id ?? 'new-course'}
+              videos={manageable}
+              course={editingCourse}
+              onComplete={async () => {
+                setEditingCourse(undefined)
+                await onUploaded()
+              }}
+              onCancel={() => setEditingCourse(undefined)}
+              onError={onError}
+            />
+          </section>
+          <ManageCourses
           courses={manageableCourses}
           onEdit={(course) => {
             setEditingCourse(course)
-            setMode('course')
+            setWorkspace('courses')
             window.scrollTo({ top: 0, behavior: 'smooth' })
           }}
           onUpdate={onUploaded}
           onError={onError}
-        />
-        <ManageVideos videos={manageable} onUpdate={onUpdate} onError={onError} />
+          />
+        </div>}
+        {workspace === 'videos' && <ManageVideos videos={manageable} onUpdate={onUpdate} onError={onError} />}
       </div>
     </div>
   )

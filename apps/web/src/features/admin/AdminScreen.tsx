@@ -1,8 +1,7 @@
-import type { FormEvent } from 'react'
-import { PageHeader, SectionHeading } from '../../components/ui'
+import { useState, type FormEvent } from 'react'
+import { PageHeader, SectionHeading, WorkspaceTabs } from '../../components/ui'
 import { api, errorMessage } from '../../lib/api'
 import type { CourseSummary, Organization, User, Video } from '../../types'
-import { ManageVideos } from '../videos/ManageVideos'
 import { PlatformGyms } from './PlatformGyms'
 
 type AdminScreenProps = {
@@ -12,7 +11,6 @@ type AdminScreenProps = {
   organizations: Organization[]
   platformOwner: boolean
   onRefreshUsers: () => Promise<void>
-  onRefreshVideos: () => Promise<void>
   setError: (value: string) => void
   setNotice: (value: string) => void
 }
@@ -24,10 +22,10 @@ export function AdminScreen({
   organizations,
   platformOwner,
   onRefreshUsers,
-  onRefreshVideos,
   setError,
   setNotice,
 }: AdminScreenProps) {
+  const [workspace, setWorkspace] = useState<'members' | 'gyms' | 'access'>('members')
   async function createUser(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     const form = event.currentTarget
@@ -96,6 +94,17 @@ export function AdminScreen({
   return (
     <div className="screen">
       <PageHeader title="Admin" description="Manage member access and the video catalog." />
+      {platformOwner && <WorkspaceTabs
+        label="Administration workspace"
+        value={workspace}
+        items={[
+          { id: 'members', label: 'Members', count: users.length },
+          { id: 'gyms', label: 'Gyms', count: organizations.length },
+          { id: 'access', label: 'Content access' },
+        ]}
+        onChange={setWorkspace}
+      />}
+      {workspace === 'members' && <>
       <section className="surface admin-create">
         <div className="admin-create-copy">
           <h2>Create account</h2>
@@ -129,7 +138,6 @@ export function AdminScreen({
           </div>
         </form>
       </section>
-      {platformOwner && <PlatformGyms organizations={organizations} videos={videos} courses={courses} setError={setError} setNotice={setNotice} />}
       <section className="section">
         <SectionHeading title="Members" action={<span className="admin-count">{users.length} accounts</span>} />
         <div className="responsive-table surface member-table">
@@ -205,7 +213,9 @@ export function AdminScreen({
           </table>
         </div>
       </section>
-      <ManageVideos videos={videos} onUpdate={onRefreshVideos} onError={setError} />
+      </>}
+      {platformOwner && workspace === 'gyms' && <PlatformGyms mode="gyms" organizations={organizations} videos={videos} courses={courses} setError={setError} setNotice={setNotice} />}
+      {platformOwner && workspace === 'access' && <PlatformGyms mode="access" organizations={organizations} videos={videos} courses={courses} setError={setError} setNotice={setNotice} />}
     </div>
   )
 }

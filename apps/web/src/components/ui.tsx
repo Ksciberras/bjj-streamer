@@ -23,6 +23,21 @@ export function SectionHeading({ id, title, action }: { id?: string; title: stri
   </div>
 }
 
+export function WorkspaceTabs<T extends string>({ label, value, items, onChange }: { label: string; value: T; items: Array<{ id: T; label: string; count?: number }>; onChange: (value: T) => void }) {
+  return <div className="workspace-tabs" role="tablist" aria-label={label}>
+    {items.map((item) => <button
+      key={item.id}
+      type="button"
+      role="tab"
+      aria-selected={value === item.id}
+      className={value === item.id ? 'active' : ''}
+      onClick={() => onChange(item.id)}
+    >
+      {item.label}{item.count !== undefined && <span>{item.count}</span>}
+    </button>)}
+  </div>
+}
+
 export function Visibility({ value }: { value: Video['visibility'] }) {
   return <span className={`visibility ${value}`}>
     {value === 'private' ? 'Private video' : 'Shared with members'}

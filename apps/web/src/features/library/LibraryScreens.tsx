@@ -25,10 +25,11 @@ export function HomeScreen({ videos, popularVideos, popularTitle, progress, load
           ? <ContinueCard video={continueVideo} savedAt={progress[continueVideo.id]} onResume={() => openVideo(continueVideo)} />
           : <EmptyState title="No saved progress yet" body="Start a video from your library and it will appear here." action={<button onClick={() => browse({})}>Browse library</button>} />}
     </section>
-    {!loading && popularVideos.length > 0 && <section className="section" aria-labelledby="popular-title">
+    <div className="home-discovery-grid">
+    {!loading && popularVideos.length > 0 && <section className="section home-discovery-section" aria-labelledby="popular-title">
       <SectionHeading id="popular-title" title={popularTitle} action={<span className="home-section-context">Most studied in the last 30 days</span>} />
-      <div className="video-grid">
-        {popularVideos.map((video) => (
+      <div className="video-grid compact-video-grid">
+        {popularVideos.slice(0, 2).map((video) => (
           <VideoCard
             key={video.id}
             video={video}
@@ -39,14 +40,15 @@ export function HomeScreen({ videos, popularVideos, popularTitle, progress, load
         ))}
       </div>
     </section>}
-    <section className="section" aria-labelledby="recent-title">
+    <section className="section home-discovery-section" aria-labelledby="recent-title">
       <SectionHeading id="recent-title" title="Recently added" action={<button className="text-button" onClick={() => browse({})}>View library →</button>} />
       {loading
         ? <LoadingSkeleton />
         : ready.length
-          ? <div className="video-grid">{ready.slice(0, 4).map((video) => <VideoCard key={video.id} video={video} savedAt={progress[video.id]} onOpen={() => openVideo(video)} />)}</div>
+          ? <div className="video-grid compact-video-grid">{ready.slice(0, 2).map((video) => <VideoCard key={video.id} video={video} savedAt={progress[video.id]} onOpen={() => openVideo(video)} />)}</div>
           : <EmptyState title="The library is empty" body="Ready videos will appear here." />}
     </section>
+    </div>
     {instructors.length > 0 && <section className="section" aria-labelledby="instructors-title">
       <SectionHeading id="instructors-title" title="Browse by instructor" />
       <div className="browse-list">{instructors.map((instructor) => <button key={instructor} onClick={() => browse({ instructor })}><span className="browse-monogram">{initials(instructor)}</span><span>{instructor}</span><span aria-hidden="true">→</span></button>)}</div>
