@@ -38,7 +38,7 @@ Sign in through the browser. Administrators can create known user accounts, assi
 
 Administrators and instructors can upload browser-compatible `.mp4` files up to 5 GiB. The browser uploads bytes directly to object storage; they do not pass through the Go API. Students cannot request uploads. Shared ready videos appear to every authenticated user, while private videos appear only to their uploader and administrators. `personal_purchase` videos must be private.
 
-Administrators can also use **Course batch** on the Upload screen to select
+Administrators can also use **Course batch** in the Content workspace to select
 multiple MP4s, enter shared course metadata once, review filename-derived
 titles, and upload two files at a time. Each file still uses its own existing
 presigned PUT and can be retried independently; this is not multipart or

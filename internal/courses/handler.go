@@ -105,10 +105,14 @@ func (h *Handler) list(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		if allowed {
+			thumbnailURL := ""
+			if len(visible.Videos) > 0 {
+				thumbnailURL = visible.Videos[0].ThumbnailURL
+			}
 			result = append(result, map[string]any{
 				"id": course.ID, "created_by_user_id": course.CreatedByUserID, "title": course.Title,
 				"instructor_name": course.InstructorName, "organization_id": course.OrganizationID, "video_count": len(visible.Videos),
-				"can_manage": canManageCourse(session, course),
+				"can_manage": canManageCourse(session, course), "thumbnail_url": thumbnailURL,
 			})
 		}
 	}

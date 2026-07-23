@@ -103,7 +103,7 @@ export function ManageVideos({ videos, onUpdate, onError }: ManageVideosProps) {
                 <td>
                   <div className="manage-row-actions">
                     <details className="row-editor">
-                      <summary>Edit</summary>
+                      <summary>Actions</summary>
                       <form onSubmit={(event) => void updateVideo(event, video)}>
                       <label>
                         Title
@@ -155,10 +155,12 @@ export function ManageVideos({ videos, onUpdate, onError }: ManageVideosProps) {
                           }}
                         />
                       </label>
-                      <button type="submit">Save</button>
+                      <div className="row-editor-actions">
+                        <button type="button" className="danger-button" onClick={() => void deleteVideo(video)}>Delete video</button>
+                        <button type="submit">Save changes</button>
+                      </div>
                       </form>
                     </details>
-                    <button type="button" className="danger-button" onClick={() => void deleteVideo(video)}>Delete</button>
                   </div>
                 </td>
               </tr>

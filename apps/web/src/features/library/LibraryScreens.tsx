@@ -120,10 +120,11 @@ export function LibraryScreen({ videos, courses = [], progress, loading, initial
         <div className="course-grid">
           {courses.map((course) => (
             <button type="button" className="course-card" key={course.id} onClick={() => openCourse(course)}>
-              <span className="course-card-count">{course.video_count} {course.video_count === 1 ? 'chapter' : 'chapters'}</span>
-              <strong>{course.title}</strong>
-              <span>{course.instructor_name}</span>
-              <span className="course-card-action">Start course →</span>
+              <span className="course-card-cover">
+                {course.thumbnail_url ? <img src={course.thumbnail_url} alt="" loading="lazy" /> : <span aria-hidden="true">{initials(course.instructor_name)}</span>}
+                <small>{course.video_count} {course.video_count === 1 ? 'chapter' : 'chapters'}</small>
+              </span>
+              <span className="course-card-copy"><strong>{course.title}</strong><span>{course.instructor_name}</span><span className="course-card-action">Start course →</span></span>
             </button>
           ))}
         </div>
@@ -165,6 +166,7 @@ function VideoCard({ video, savedAt = 0, savedForLater = false, context, onToggl
   return <article className="video-card">
     <button className="video-cover" onClick={onOpen} aria-label={`Study ${video.title}`}>
       <VideoPlaceholder video={video} label="Study video" />
+      <span className="video-cover-action" aria-hidden="true">Study →</span>
       {savedAt > 0 && <span className="resume-chip">{formatTime(savedAt)} saved</span>}
     </button>
     <div className="video-card-body">

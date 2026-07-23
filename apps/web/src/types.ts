@@ -8,6 +8,7 @@ export type User = {
   disabled?: boolean
   created_at?: string
   organization_id?: string
+  organization_name?: string
   is_platform_owner?: boolean
 }
 
@@ -41,6 +42,7 @@ export type CourseSummary = {
   video_count: number
   organization_id?: string
   can_manage?: boolean
+  thumbnail_url?: string
 }
 
 export type CourseVideo = Video & {
