@@ -96,7 +96,7 @@ describe('App', () => {
     }))
     render(<App />)
     fireEvent.click(await screen.findByRole('button', { name: 'Study Armbar' }))
-    expect(await screen.findByRole('heading', { name: 'Notes' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: 'Study notes' })).toBeInTheDocument()
     const video = document.querySelector('video') as HTMLVideoElement
     fireEvent.click(screen.getByRole('button', { name: '0:42' }))
     expect(video.currentTime).toBe(42)

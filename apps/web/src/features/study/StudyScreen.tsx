@@ -205,25 +205,42 @@ export function StudyScreen({ video, course, autoPlay, initialSeek, savedForLate
     <div className="screen study-screen">
       <div className="study-toolbar">
         <button className="back-button" onClick={() => void back()}>← Back to library</button>
+        {course && courseIndex >= 0 && (
+          <span className="study-course-position">{course.title} · {courseIndex + 1} of {course.videos.length}</span>
+        )}
       </div>
       <div className="study-layout">
-        <Player
-          video={video}
-          player={player}
-          url={url}
-          loading={loading}
-          resumeAt={resumeAt}
-          onTimeUpdate={timeUpdate}
-          onPause={saveProgress}
-          onEnded={advance}
-          autoplayBlocked={autoplayBlocked}
-          savedForLater={savedForLater}
-          onToggleWatchLater={onToggleWatchLater}
-          onResumeAutoplay={() => {
-            setAutoplayBlocked(false)
-            void player.current?.play()
-          }}
-        />
+        <div className="study-primary-column">
+          <Player
+            video={video}
+            player={player}
+            url={url}
+            loading={loading}
+            resumeAt={resumeAt}
+            onTimeUpdate={timeUpdate}
+            onPause={saveProgress}
+            onEnded={advance}
+            autoplayBlocked={autoplayBlocked}
+            savedForLater={savedForLater}
+            onToggleWatchLater={onToggleWatchLater}
+            onResumeAutoplay={() => {
+              setAutoplayBlocked(false)
+              void player.current?.play()
+            }}
+          />
+          {course && courseIndex >= 0 && (
+            <nav className="course-navigation" aria-label="Course chapters">
+              <div className="course-navigation-copy">
+                <span>Up next in {course.title}</span>
+                <strong>{nextVideo?.title ?? 'Course complete'}</strong>
+              </div>
+              <div className="course-navigation-actions">
+                <button type="button" className="secondary-button" disabled={!previousVideo} onClick={() => previousVideo && onSelectCourseVideo(previousVideo)}>← Previous</button>
+                <button type="button" disabled={!nextVideo} onClick={() => nextVideo && onSelectCourseVideo(nextVideo)}>Next chapter →</button>
+              </div>
+            </nav>
+          )}
+        </div>
         <NotesPanel
           notes={sortedNotes}
           draftTimestamp={draftTimestamp}
@@ -235,18 +252,6 @@ export function StudyScreen({ video, course, autoPlay, initialSeek, savedForLate
           onDelete={deleteNote}
         />
       </div>
-      {course && courseIndex >= 0 && (
-        <nav className="course-navigation" aria-label="Course chapters">
-          <div>
-            <span>Course · Chapter {courseIndex + 1} of {course.videos.length}</span>
-            <strong>{course.title}</strong>
-          </div>
-          <div>
-            <button type="button" className="secondary-button" disabled={!previousVideo} onClick={() => previousVideo && onSelectCourseVideo(previousVideo)}>← Previous</button>
-            <button type="button" disabled={!nextVideo} onClick={() => nextVideo && onSelectCourseVideo(nextVideo)}>Next chapter →</button>
-          </div>
-        </nav>
-      )}
     </div>
   )
 }
@@ -269,20 +274,6 @@ type PlayerProps = {
 function Player({ video, player, url, loading, resumeAt, onTimeUpdate, onPause, onEnded, autoplayBlocked, onResumeAutoplay, savedForLater, onToggleWatchLater }: PlayerProps) {
   return (
     <section className="player-column" aria-labelledby="video-title">
-      <header className="player-heading">
-        <div>
-          <span className="editorial-label">Now studying</span>
-          <h1 id="video-title">{video.title}</h1>
-          <p>{video.instructor_name}{video.chapter_name ? ` · ${video.chapter_name}` : ''}</p>
-        </div>
-        <div className="player-heading-actions">
-          <Visibility value={video.visibility} />
-          <button type="button" className={`player-bookmark${savedForLater ? ' saved' : ''}`} onClick={onToggleWatchLater}>
-            <BookmarkIcon filled={savedForLater} />
-            <span>{savedForLater ? 'Saved' : 'Watch later'}</span>
-          </button>
-        </div>
-      </header>
       <div className="player-frame">
         {loading
           ? <div className="player-loading"><span aria-hidden="true" /><strong>Preparing video</strong><small>Requesting secure playback…</small></div>
@@ -304,14 +295,35 @@ function Player({ video, player, url, loading, resumeAt, onTimeUpdate, onPause, 
             : <ErrorState title="Couldn’t load this video" body="Check your connection and try again." />}
         {autoplayBlocked && <button className="autoplay-prompt" type="button" onClick={onResumeAutoplay}>Play next chapter</button>}
       </div>
+      <header className="player-heading">
+        <div className="player-title-copy">
+          <span className="editorial-label">Now studying</span>
+          <h1 id="video-title">{video.title}</h1>
+          <p>{video.instructor_name}{video.chapter_name ? ` · ${video.chapter_name}` : ''}</p>
+        </div>
+        <button
+          type="button"
+          className={`player-bookmark${savedForLater ? ' saved' : ''}`}
+          aria-pressed={savedForLater}
+          onClick={onToggleWatchLater}
+        >
+          <BookmarkIcon filled={savedForLater} />
+          <span>{savedForLater ? 'Saved to watch later' : 'Save for later'}</span>
+        </button>
+      </header>
       <div className="player-details">
-        <div className="detail-line"><span>{video.instructional_name || 'Instructional video'}</span>{resumeAt > 0 && <span className="resume-detail">Resumed at <code>{formatTime(resumeAt)}</code></span>}</div>
+        <div className="player-meta">
+          <Visibility value={video.visibility} />
+          <span>{video.instructional_name || 'Instructional video'}</span>
+          {resumeAt > 0 && <span className="resume-detail">Started at <code>{formatTime(resumeAt)}</code></span>}
+        </div>
         {video.tags.length > 0 && (
           <div className="tag-list compact">
             {video.tags.map((tag) => <span key={tag}>{tag}</span>)}
           </div>
         )}
       </div>
+      {video.description && <p className="player-description">{video.description}</p>}
     </section>
   )
 }
@@ -332,19 +344,25 @@ function NotesPanel(props: NotesPanelProps) {
   return (
     <aside className="notes-panel" aria-labelledby="notes-title">
       <div className="notes-heading">
-        <div><h2 id="notes-title">Notes</h2><p>Private to you</p></div>
+        <div><h2 id="notes-title">Study notes</h2><p>Private to you · click a timestamp to seek</p></div>
         <span aria-label={`${notes.length} notes`}>{notes.length}</span>
       </div>
-      <button className="capture-button" onClick={onCapture}>
-        Add note at {formatTime(draftTimestamp)} <kbd>N</kbd>
-      </button>
-      <form className="note-composer" onSubmit={onAdd}>
-        <label>
-          <span>Note at <code>{formatTime(draftTimestamp)}</code></span>
-          <textarea ref={noteInput} name="body" required maxLength={5000} placeholder="Add a detail to revisit…" />
-        </label>
-        <button type="submit">Save note</button>
-      </form>
+      <div className="note-composer-shell">
+        <button className="capture-button" onClick={onCapture}>
+          <span><strong>Capture current time</strong><small>Add note at <code>{formatTime(draftTimestamp)}</code></small></span>
+          <kbd>N</kbd>
+        </button>
+        <form className="note-composer" onSubmit={onAdd}>
+          <label>
+            <span className="sr-only">Note at {formatTime(draftTimestamp)}</span>
+            <textarea ref={noteInput} name="body" required maxLength={5000} placeholder="What do you want to remember?" />
+          </label>
+          <div className="note-composer-actions">
+            <span>Saved at <code>{formatTime(draftTimestamp)}</code></span>
+            <button type="submit">Save note</button>
+          </div>
+        </form>
+      </div>
       <div className="notes-list">
         {notes.length
           ? notes.map((note) => (
