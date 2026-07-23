@@ -97,12 +97,12 @@ export function AdminScreen({
     <div className="screen">
       <PageHeader title="Admin" description="Manage member access and the video catalog." />
       <section className="surface admin-create">
-        <div>
+        <div className="admin-create-copy">
           <h2>Create account</h2>
-          <p>Create private access for a known member.</p>
+          <p>Add a known member and place them in the correct gym.</p>
         </div>
-        <form onSubmit={createUser}>
-          <label>Email<input name="email" type="email" required /></label>
+        <form className={platformOwner ? 'account-create-form platform' : 'account-create-form'} onSubmit={createUser}>
+          <label>Email address<input name="email" type="email" required placeholder="member@example.com" /></label>
           <label>
             Role
             <select name="role" defaultValue="student">
@@ -111,19 +111,27 @@ export function AdminScreen({
               <option value="admin">Admin</option>
             </select>
           </label>
-          {platformOwner && <label>Gym<select name="organization_id" required><option value="">Choose gym</option>{organizations.map((organization) => <option value={organization.id} key={organization.id}>{organization.name}</option>)}</select></label>}
+          {platformOwner && (
+            <label>
+              Gym
+              <select name="organization_id" required>
+                <option value="">Choose gym</option>
+                {organizations.map((organization) => <option value={organization.id} key={organization.id}>{organization.name}</option>)}
+              </select>
+            </label>
+          )}
           <label>
             Temporary password
             <input name="password" type="password" minLength={12} required autoComplete="new-password" />
           </label>
-          <button type="submit">Create account</button>
+          <button type="submit">Create member</button>
         </form>
       </section>
       {platformOwner && <PlatformGyms organizations={organizations} videos={videos} courses={courses} setError={setError} setNotice={setNotice} />}
       <section className="section">
-        <SectionHeading title="Members" />
-        <div className="responsive-table surface">
-          <table>
+        <SectionHeading title="Members" action={<span className="admin-count">{users.length} accounts</span>} />
+        <div className="responsive-table surface member-table">
+          <table aria-label="Member accounts">
             <thead>
               <tr>
                 <th>Email</th>
@@ -137,31 +145,56 @@ export function AdminScreen({
             <tbody>
               {users.map((item) => (
                 <tr key={item.id}>
-                  <td><strong>{item.email}</strong></td>
-                  <td colSpan={platformOwner ? 5 : 4}>
-                    <form className="table-form" onSubmit={(event) => void updateUser(event, item)}>
-                      <select name="role" defaultValue={item.role} aria-label={`Role for ${item.email}`}>
-                        <option value="admin">Admin</option>
-                        <option value="instructor">Instructor</option>
-                        <option value="student">Student</option>
-                      </select>
-                      {platformOwner && !item.is_platform_owner && (
-                        <select key={`${item.id}:${item.organization_id}`} defaultValue={item.organization_id} aria-label={`Gym for ${item.email}`} required onChange={(event) => void moveUser(item, event.target.value)}>
-                          {organizations.map((organization) => <option value={organization.id} key={organization.id}>{organization.name}</option>)}
-                        </select>
-                      )}
-                      <label className="check">
-                        <input name="disabled" type="checkbox" defaultChecked={item.disabled} /> Disabled
-                      </label>
-                      <input
-                        name="password"
-                        type="password"
-                        minLength={12}
-                        placeholder="New password (optional)"
-                        aria-label={`New password for ${item.email}`}
-                        autoComplete="new-password"
-                      />
-                      <button type="submit">Save</button>
+                  <td>
+                    <strong>{item.email}</strong>
+                    {item.is_platform_owner && <small className="platform-owner-label">Platform owner</small>}
+                  </td>
+                  <td>
+                    <select form={`member-${item.id}`} name="role" defaultValue={item.role} aria-label={`Role for ${item.email}`} disabled={item.is_platform_owner}>
+                      <option value="admin">Admin</option>
+                      <option value="instructor">Instructor</option>
+                      <option value="student">Student</option>
+                    </select>
+                  </td>
+                  {platformOwner && (
+                    <td>
+                      {item.is_platform_owner
+                        ? <span className="platform-scope">All gyms</span>
+                        : (
+                          <select
+                            className="gym-select"
+                            key={`${item.id}:${item.organization_id}`}
+                            defaultValue={item.organization_id}
+                            aria-label={`Gym for ${item.email}`}
+                            required
+                            onChange={(event) => void moveUser(item, event.target.value)}
+                          >
+                            {organizations.map((organization) => <option value={organization.id} key={organization.id}>{organization.name}</option>)}
+                          </select>
+                        )}
+                    </td>
+                  )}
+                  <td>
+                    <label className="member-status">
+                      <input form={`member-${item.id}`} name="disabled" type="checkbox" defaultChecked={item.disabled} disabled={item.is_platform_owner} />
+                      <span>{item.disabled ? 'Disabled' : 'Enabled'}</span>
+                    </label>
+                  </td>
+                  <td>
+                    <input
+                      form={`member-${item.id}`}
+                      name="password"
+                      type="password"
+                      minLength={12}
+                      placeholder="Leave unchanged"
+                      aria-label={`New password for ${item.email}`}
+                      autoComplete="new-password"
+                      disabled={item.is_platform_owner}
+                    />
+                  </td>
+                  <td>
+                    <form id={`member-${item.id}`} onSubmit={(event) => void updateUser(event, item)}>
+                      <button type="submit" className="member-save" disabled={item.is_platform_owner}>Save changes</button>
                     </form>
                   </td>
                 </tr>

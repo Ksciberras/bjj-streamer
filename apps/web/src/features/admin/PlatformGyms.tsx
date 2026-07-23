@@ -67,19 +67,32 @@ export function PlatformGyms(props: PlatformGymsProps) {
 
   return (
     <section className="section platform-gyms">
-      <SectionHeading title="Gyms and availability" />
-      <form className="admin-create surface" onSubmit={createGym}>
-        <label>Gym name<input name="name" required maxLength={120} /></label>
-        <label>Slug<input name="slug" required pattern="[a-z0-9]+(?:-[a-z0-9]+)*" /></label>
+      <SectionHeading title="Gyms" action={<span className="admin-count">{organizations.length} gyms</span>} />
+      <form className="gym-create-form surface" onSubmit={createGym}>
+        <div>
+          <strong>Add a gym</strong>
+          <span>Create the gym first, then add its administrator above.</span>
+        </div>
+        <label>Gym name<input name="name" required maxLength={120} placeholder="e.g. BJJ Cork" /></label>
+        <label>URL slug<input name="slug" required pattern="[a-z0-9]+(?:-[a-z0-9]+)*" placeholder="e.g. bjj-cork" /></label>
         <button>Create gym</button>
       </form>
+      <div className="gym-availability-heading">
+        <div>
+          <h3>Content availability</h3>
+          <p>Choose which videos and courses each gym can access.</p>
+        </div>
+      </div>
       {organizations.map((organization) => (
-        <details className="surface" key={organization.id}>
-          <summary>{organization.name}</summary>
+        <details className="surface gym-access" key={organization.id}>
+          <summary>
+            <span><strong>{organization.name}</strong><small>{organization.slug}</small></span>
+            <span>Manage access</span>
+          </summary>
           <div className="availability-grid">
-            <div>
-              <h3>Videos</h3>
-              {videos.map((video) => (
+            <div className="availability-list">
+              <div className="availability-list-heading"><h4>Videos</h4><span>{videos.length}</span></div>
+              {videos.length ? videos.map((video) => (
                 <label className="check" key={video.id}>
                   <input
                     type="checkbox"
@@ -89,11 +102,11 @@ export function PlatformGyms(props: PlatformGymsProps) {
                   />
                   {video.title}
                 </label>
-              ))}
+              )) : <p>No videos uploaded.</p>}
             </div>
-            <div>
-              <h3>Courses</h3>
-              {courses.map((course) => (
+            <div className="availability-list">
+              <div className="availability-list-heading"><h4>Courses</h4><span>{courses.length}</span></div>
+              {courses.length ? courses.map((course) => (
                 <label className="check" key={course.id}>
                   <input
                     type="checkbox"
@@ -103,7 +116,7 @@ export function PlatformGyms(props: PlatformGymsProps) {
                   />
                   {course.title}
                 </label>
-              ))}
+              )) : <p>No courses created.</p>}
             </div>
           </div>
         </details>

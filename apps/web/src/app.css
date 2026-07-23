@@ -244,12 +244,24 @@ td small { margin-top: .2rem; }
 .table-video > img, .table-video > span { width: 54px; aspect-ratio: 16 / 9; flex: 0 0 auto; border: 1px solid var(--border); border-radius: 3px; background: var(--surface-subtle); object-fit: cover; }
 .check { display: flex; grid-template-columns: auto 1fr; align-items: center; gap: .5rem; }
 .check input { width: auto; accent-color: var(--accent); }
-.admin-create { display: grid; grid-template-columns: minmax(200px, .6fr) minmax(520px, 1.4fr); gap: 2rem; padding: 1.4rem; }
-.admin-create h2 { margin-bottom: .45rem; font-size: 1rem; }
-.admin-create p { font-size: .75rem; }
-.admin-create form { display: grid; grid-template-columns: 1fr 150px 1fr auto; gap: .75rem; align-items: end; }
-.table-form { display: grid; grid-template-columns: 130px 110px minmax(180px, 1fr) auto; gap: .65rem; align-items: center; }
-.table-form .check { font-size: .72rem; }
+.admin-create { display: grid; grid-template-columns: minmax(180px, .45fr) minmax(0, 1.55fr); gap: 2rem; padding: 1.5rem; }
+.admin-create h2 { margin: 0 0 .45rem; font-size: 1.05rem; }
+.admin-create p { max-width: 28ch; margin: 0; font-size: .75rem; }
+.account-create-form { display: grid; grid-template-columns: minmax(180px, 1fr) 140px minmax(180px, 1fr) auto; gap: .75rem; align-items: end; }
+.account-create-form.platform { grid-template-columns: minmax(180px, 1fr) 130px 160px minmax(180px, 1fr) auto; }
+.admin-count { color: var(--muted); font-size: .72rem; font-weight: 500; }
+.member-table table { min-width: 920px; }
+.member-table th:first-child, .member-table td:first-child { width: 24%; }
+.member-table td { padding-top: .65rem; padding-bottom: .65rem; }
+.member-table select, .member-table input[type="password"] { min-height: 36px; padding: .45rem .55rem; font-size: .72rem; }
+.member-table input[type="password"] { width: min(210px, 18vw); }
+.member-table form { margin: 0; }
+.member-save { min-height: 36px; padding: .45rem .65rem; white-space: nowrap; }
+.member-status { display: inline-flex; min-height: 36px; align-items: center; gap: .45rem; color: var(--muted); font-size: .7rem; cursor: pointer; }
+.member-status input { width: 15px; height: 15px; accent-color: var(--accent); }
+.platform-owner-label { color: var(--accent); font-size: .66rem; }
+.platform-scope { color: var(--muted); font-size: .72rem; }
+.gym-select { min-width: 145px; }
 
 .empty-state { display: grid; min-height: 180px; place-items: center; align-content: center; padding: 2rem; border: 1px dashed var(--border-strong); border-radius: var(--radius); background: rgba(255,255,255,.012); text-align: center; }
 .empty-state h3 { margin: 0 0 .35rem; font-size: .92rem; }
@@ -286,6 +298,8 @@ td small { margin-top: .2rem; }
   .browse-list { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .study-layout { grid-template-columns: minmax(0, 2.2fr) minmax(280px, 1fr); }
   .admin-create { grid-template-columns: 1fr; }
+  .account-create-form, .account-create-form.platform { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .account-create-form button { align-self: end; }
 }
 
 @media (max-width: 760px) {
@@ -335,8 +349,7 @@ td small { margin-top: .2rem; }
   .file-summary { grid-column: 2; display: grid; }
   .upload-submit { padding: 1rem; }
   .upload-submit > button { width: 100%; min-height: 46px; }
-  .admin-create form { grid-template-columns: 1fr; }
-  .table-form { min-width: 620px; }
+  .account-create-form, .account-create-form.platform { grid-template-columns: 1fr; }
   .login-page { padding: 1rem; }
   .login-card { padding: 1.5rem; }
 }
@@ -745,35 +758,139 @@ td small { margin-top: .2rem; }
   gap: .75rem;
 }
 
-.platform-gyms details {
-  padding: .9rem 1rem;
+.gym-create-form {
+  display: grid;
+  grid-template-columns: minmax(220px, 1fr) minmax(160px, .8fr) minmax(150px, .65fr) auto;
+  align-items: end;
+  gap: .9rem;
+  padding: 1.1rem;
 }
 
-.platform-gyms summary {
+.gym-create-form > div {
+  display: grid;
+  align-self: center;
+  gap: .2rem;
+}
+
+.gym-create-form > div span,
+.gym-availability-heading p {
+  color: var(--muted);
+  font-size: .72rem;
+}
+
+.gym-availability-heading {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  margin-top: .75rem;
+}
+
+.gym-availability-heading h3,
+.gym-availability-heading p {
+  margin: 0;
+}
+
+.gym-availability-heading p {
+  margin-top: .25rem;
+}
+
+.gym-access {
+  overflow: hidden;
+}
+
+.gym-access summary {
+  display: flex;
+  min-height: 58px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: .85rem 1rem;
   cursor: pointer;
   font-weight: 700;
+  list-style-position: inside;
+}
+
+.gym-access summary:hover {
+  background: var(--surface-hover);
+}
+
+.gym-access summary > span:first-child {
+  display: inline-grid;
+  gap: .15rem;
+  margin-right: auto;
+}
+
+.gym-access summary small,
+.gym-access summary > span:last-child {
+  color: var(--muted);
+  font-size: .68rem;
+  font-weight: 500;
+}
+
+.gym-access[open] summary {
+  border-bottom: 1px solid var(--border);
 }
 
 .availability-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 1.5rem;
-  padding-top: 1rem;
+  gap: 0;
 }
 
-.availability-grid > div {
+.availability-list {
   display: grid;
   align-content: start;
-  gap: .5rem;
+  max-height: 360px;
+  overflow-y: auto;
+  padding: 1rem;
+  gap: .25rem;
 }
 
-.availability-grid h3 {
-  margin: 0 0 .35rem;
+.availability-list + .availability-list {
+  border-left: 1px solid var(--border);
+}
+
+.availability-list-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: .45rem;
+}
+
+.availability-list-heading h4,
+.availability-list p {
+  margin: 0;
+}
+
+.availability-list-heading span,
+.availability-list p {
+  color: var(--muted);
+  font-size: .68rem;
+}
+
+.availability-list .check {
+  min-height: 36px;
+  padding: .4rem .45rem;
+  border-radius: 4px;
+  font-size: .72rem;
+}
+
+.availability-list .check:hover {
+  background: var(--surface-hover);
 }
 
 @media (max-width: 700px) {
+  .gym-create-form {
+    grid-template-columns: 1fr;
+  }
+
   .availability-grid {
     grid-template-columns: 1fr;
+  }
+
+  .availability-list + .availability-list {
+    border-top: 1px solid var(--border);
+    border-left: 0;
   }
 }
 
