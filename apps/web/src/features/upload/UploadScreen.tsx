@@ -3,6 +3,7 @@ import { PageHeader } from '../../components/ui'
 import { api, errorMessage } from '../../lib/api'
 import { formatBytes } from '../../lib/format'
 import { uploadToStorage } from '../../lib/objectUpload'
+import { generateVideoThumbnail } from '../../lib/videoThumbnail'
 import type { User, Video } from '../../types'
 import { ManageVideos } from '../videos/ManageVideos'
 
@@ -24,7 +25,7 @@ export function UploadScreen({
   const [file, setFile] = useState<File | null>(null)
   const [thumbnail, setThumbnail] = useState<File | null>(null)
   const [progress, setProgress] = useState<number | null>(null)
-  const [state, setState] = useState<'idle' | 'uploading' | 'success' | 'error'>('idle')
+  const [state, setState] = useState<'idle' | 'preparing' | 'uploading' | 'success' | 'error'>('idle')
 
   async function upload(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -38,10 +39,13 @@ export function UploadScreen({
       return
     }
 
-    setState('uploading')
+    setState('preparing')
     setProgress(0)
 
     try {
+      const selectedThumbnail = thumbnail
+        ?? await generateVideoThumbnail(chosen).catch(() => null)
+      setState('uploading')
       const body = await api('/api/videos/upload-requests', {
         method: 'POST',
         body: JSON.stringify({
@@ -64,23 +68,28 @@ export function UploadScreen({
 
       await uploadToStorage(body.upload_url, chosen, setProgress)
       await api(`/api/videos/${body.video.id}/complete`, { method: 'POST', body: '{}' })
-      if (thumbnail) {
-        const thumbnailUpload = await api(
-          `/api/videos/${body.video.id}/thumbnail-upload-request`,
-          {
+      let thumbnailWarning = ''
+      if (selectedThumbnail) {
+        try {
+          const thumbnailUpload = await api(
+            `/api/videos/${body.video.id}/thumbnail-upload-request`,
+            {
+              method: 'POST',
+              body: JSON.stringify({
+                filename: selectedThumbnail.name,
+                mime_type: selectedThumbnail.type,
+                byte_size: selectedThumbnail.size,
+              }),
+            },
+          )
+          await uploadToStorage(thumbnailUpload.upload_url, selectedThumbnail, () => undefined)
+          await api(`/api/videos/${body.video.id}/thumbnail-complete`, {
             method: 'POST',
-            body: JSON.stringify({
-              filename: thumbnail.name,
-              mime_type: thumbnail.type,
-              byte_size: thumbnail.size,
-            }),
-          },
-        )
-        await uploadToStorage(thumbnailUpload.upload_url, thumbnail, () => undefined)
-        await api(`/api/videos/${body.video.id}/thumbnail-complete`, {
-          method: 'POST',
-          body: '{}',
-        })
+            body: '{}',
+          })
+        } catch {
+          thumbnailWarning = 'The video uploaded successfully, but its thumbnail could not be saved.'
+        }
       }
       form.reset()
       setFile(null)
@@ -88,6 +97,7 @@ export function UploadScreen({
       setProgress(100)
       setState('success')
       await onUploaded()
+      if (thumbnailWarning) onError(thumbnailWarning)
     } catch (reason) {
       setState('error')
       onError(errorMessage(reason, 'Unable to upload video'))
@@ -140,7 +150,7 @@ export function UploadScreen({
                     accept="image/jpeg,image/png,image/webp,.jpg,.jpeg,.png,.webp"
                     onChange={(event) => setThumbnail(event.target.files?.[0] ?? null)}
                   />
-                  <small>JPEG, PNG, or WebP up to 5 MiB.</small>
+                  <small>JPEG, PNG, or WebP up to 5 MiB. If omitted, RollStudy creates one from the video.</small>
                 </label>
                 {thumbnail && (
                   <div className="thumbnail-summary">
@@ -174,8 +184,10 @@ export function UploadScreen({
               </div>
             </div>
             <div className="upload-submit">
-              <button type="submit" disabled={state === 'uploading'}>
-                {state === 'uploading'
+              <button type="submit" disabled={state === 'preparing' || state === 'uploading'}>
+                {state === 'preparing'
+                  ? 'Preparing thumbnail…'
+                  : state === 'uploading'
                   ? `Uploading ${progress ?? 0}%`
                   : state === 'error'
                     ? 'Try upload again'

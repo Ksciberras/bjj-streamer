@@ -70,8 +70,10 @@ Only self-created or properly licensed material may be shared.
   object key.
 - Optional metadata: instructional/series name, chapter name, description, and
   comma-separated tags.
-- Optional custom thumbnail: JPEG, PNG, or WebP up to 5 MiB, uploaded directly
-  to private object storage with the same authorization floor as its video.
+- Optional custom thumbnail: JPEG, PNG, or WebP up to 5 MiB. When omitted, the
+  browser may generate a JPEG from the selected local MP4. Both variants upload
+  directly to private object storage with the same authorization floor as the
+  video.
 - Browse all accessible videos.
 - Search title, instructor, instructional name, and tags.
 - Admin can edit/archive anything.
@@ -349,8 +351,8 @@ Gate:
 - Email invitations and password recovery
 - Per-group library membership
 - Multiple organizations or gyms
-- FFmpeg, `ffprobe`, transcoding, remuxing, automatic thumbnail extraction, and
-  workers
+- FFmpeg, `ffprobe`, transcoding, remuxing, server-side thumbnail extraction,
+  and workers
 - Multipart/resumable uploads and files larger than 5 GiB
 - HLS/adaptive bitrate streaming
 - Position and technique graphs
