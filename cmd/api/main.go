@@ -13,6 +13,7 @@ import (
 	"github.com/kyransciberras/bjj-streaming/internal/audit"
 	"github.com/kyransciberras/bjj-streaming/internal/auth"
 	"github.com/kyransciberras/bjj-streaming/internal/config"
+	"github.com/kyransciberras/bjj-streaming/internal/courses"
 	"github.com/kyransciberras/bjj-streaming/internal/database"
 	"github.com/kyransciberras/bjj-streaming/internal/httpserver"
 	"github.com/kyransciberras/bjj-streaming/internal/learning"
@@ -63,9 +64,10 @@ func run() error {
 	videoStore := videos.NewStore(db)
 	videoHandler := videos.NewHandler(videoStore, objects, authHandler)
 	learningHandler := learning.NewHandler(learning.NewStore(db), videoStore, objects, authHandler)
+	courseHandler := courses.NewHandler(courses.NewStore(db), videoStore, authHandler)
 
 	server := &http.Server{
-		Addr: cfg.HTTPAddr, Handler: httpserver.New(logger, db, authHandler, userHandler, libraryHandler, auditHandler, videoHandler, learningHandler),
+		Addr: cfg.HTTPAddr, Handler: httpserver.New(logger, db, authHandler, userHandler, libraryHandler, auditHandler, videoHandler, learningHandler, courseHandler),
 		ReadHeaderTimeout: 5 * time.Second, ReadTimeout: 15 * time.Second,
 		WriteTimeout: 15 * time.Second, IdleTimeout: 60 * time.Second,
 	}

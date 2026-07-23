@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { AppShell } from '../../components/AppShell'
 import { StatusMessage } from '../../components/ui'
 import { api, errorMessage } from '../../lib/api'
-import type { ProgressMap, User, Video, View } from '../../types'
+import type { Course, CourseSummary, CourseVideo, ProgressMap, User, Video, View } from '../../types'
 import { AdminScreen } from '../admin/AdminScreen'
 import { HomeScreen, LibraryScreen } from '../library/LibraryScreens'
 import { StudyScreen } from '../study/StudyScreen'
@@ -18,6 +18,9 @@ export function Workspace({ user, logout }: WorkspaceProps) {
   const [users, setUsers] = useState<User[]>([])
   const [videos, setVideos] = useState<Video[]>([])
   const [progress, setProgress] = useState<ProgressMap>({})
+  const [courses, setCourses] = useState<CourseSummary[]>([])
+  const [activeCourse, setActiveCourse] = useState<Course | null>(null)
+  const [autoplay, setAutoplay] = useState(false)
   const [selectedVideo, setSelectedVideo] = useState<Video | null>(null)
   const [loadingVideos, setLoadingVideos] = useState(true)
   const [error, setError] = useState('')
@@ -52,12 +55,17 @@ export function Workspace({ user, logout }: WorkspaceProps) {
     void loadProgress(next)
   }
 
+  async function refreshCourses() {
+    setCourses((await api('/api/courses')).courses)
+  }
+
   useEffect(() => {
     let cancelled = false
-    void api('/api/videos')
-      .then((body) => {
+    void Promise.all([api('/api/videos'), api('/api/courses')])
+      .then(([body, courseBody]) => {
         if (!cancelled) {
           setVideos(body.videos)
+          setCourses(courseBody.courses)
           void loadProgress(body.videos)
         }
       })
@@ -89,12 +97,39 @@ export function Workspace({ user, logout }: WorkspaceProps) {
 
   function navigate(next: View) {
     setSelectedVideo(null)
+    setActiveCourse(null)
     setView(next)
     setError('')
     window.scrollTo({ top: 0, behavior: 'smooth' })
   }
 
   function openVideo(video: Video) {
+    setActiveCourse(null)
+    setAutoplay(false)
+    setSelectedVideo(video)
+    setError('')
+    window.scrollTo({ top: 0 })
+  }
+
+  async function openCourse(summary: CourseSummary) {
+    try {
+      const body = await api(`/api/courses/${summary.id}`)
+      const course: Course = body.course
+      if (!course.videos.length) {
+        setError('This course has no videos you can access.')
+        return
+      }
+      setActiveCourse(course)
+      setAutoplay(false)
+      setSelectedVideo(course.videos[0])
+      window.scrollTo({ top: 0 })
+    } catch (reason) {
+      setError(errorMessage(reason, 'Unable to open course'))
+    }
+  }
+
+  function selectCourseVideo(video: CourseVideo, playAutomatically = false) {
+    setAutoplay(playAutomatically)
     setSelectedVideo(video)
     setError('')
     window.scrollTo({ top: 0 })
@@ -110,8 +145,15 @@ export function Workspace({ user, logout }: WorkspaceProps) {
     if (selectedVideo) {
       return (
         <StudyScreen
+          key={selectedVideo.id}
           video={selectedVideo}
-          onBack={() => setSelectedVideo(null)}
+          course={activeCourse}
+          autoPlay={autoplay}
+          onSelectCourseVideo={selectCourseVideo}
+          onBack={() => {
+            setSelectedVideo(null)
+            setActiveCourse(null)
+          }}
           setError={setError}
           onProgress={(seconds) =>
             setProgress((current) => ({ ...current, [selectedVideo.id]: seconds }))
@@ -125,10 +167,12 @@ export function Workspace({ user, logout }: WorkspaceProps) {
         <LibraryScreen
           key={`${librarySeed.instructor ?? ''}:${librarySeed.tag ?? ''}`}
           videos={videos}
+          courses={courses}
           progress={progress}
           loading={loadingVideos}
           initialFilter={librarySeed}
           openVideo={openVideo}
+          openCourse={(course) => void openCourse(course)}
           onSearch={async (query) => {
             setLoadingVideos(true)
             try {
@@ -149,7 +193,7 @@ export function Workspace({ user, logout }: WorkspaceProps) {
           user={user}
           videos={videos}
           onUploaded={async () => {
-            await refreshVideos()
+            await Promise.all([refreshVideos(), refreshCourses()])
             setNotice('Upload complete. The video is ready to study.')
           }}
           onError={setError}

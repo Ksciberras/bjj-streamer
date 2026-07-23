@@ -27,6 +27,23 @@ export type Video = {
   created_at?: string
 }
 
+export type CourseSummary = {
+  id: string
+  created_by_user_id: string
+  title: string
+  instructor_name: string
+  video_count: number
+}
+
+export type CourseVideo = Video & {
+  sequence_number: number
+  course_chapter_name?: string
+}
+
+export type Course = Omit<CourseSummary, 'video_count'> & {
+  videos: CourseVideo[]
+}
+
 export type Note = {
   id: string
   timestamp_seconds: number

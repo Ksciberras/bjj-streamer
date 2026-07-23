@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from 'react'
-import { errorMessage } from '../../lib/api'
+import { api, errorMessage } from '../../lib/api'
 import { formatBytes } from '../../lib/format'
 import { generateVideoThumbnail } from '../../lib/videoThumbnail'
 import { uploadVideo, type VideoMetadata } from '../../lib/videoUpload'
@@ -11,6 +11,7 @@ type QueueItem = {
   progress: number
   status: 'queued' | 'preparing' | 'uploading' | 'complete' | 'error'
   error: string
+  videoID?: string
 }
 
 type BatchUploadFormProps = {
@@ -63,6 +64,7 @@ export function BatchUploadForm({ onComplete, onError }: BatchUploadFormProps) {
     onError('')
 
     let cursor = 0
+    let failures = 0
     async function worker() {
       while (cursor < pendingItems.length) {
         const item = pendingItems[cursor++]
@@ -70,14 +72,16 @@ export function BatchUploadForm({ onComplete, onError }: BatchUploadFormProps) {
         try {
           const thumbnail = await generateVideoThumbnail(item.file).catch(() => null)
           update(item.id, { status: 'uploading' })
-          await uploadVideo({
+          const result = await uploadVideo({
             file: item.file,
             thumbnail,
             metadata: { ...shared, title: item.title },
             onProgress: (progress) => update(item.id, { progress }),
           })
-          update(item.id, { status: 'complete', progress: 100 })
+          item.videoID = result.video.id
+          update(item.id, { status: 'complete', progress: 100, videoID: result.video.id })
         } catch (reason) {
+          failures += 1
           update(item.id, {
             status: 'error',
             error: errorMessage(reason, 'Upload failed'),
@@ -87,6 +91,23 @@ export function BatchUploadForm({ onComplete, onError }: BatchUploadFormProps) {
     }
 
     await Promise.all([worker(), worker()])
+    if (!failures) {
+      try {
+        await api('/api/courses', {
+          method: 'POST',
+          body: JSON.stringify({
+            title: shared.instructional_name,
+            instructor_name: shared.instructor_name,
+            videos: items.map((item) => ({
+              video_id: item.videoID,
+              chapter_name: item.title,
+            })),
+          }),
+        })
+      } catch (reason) {
+        onError(errorMessage(reason, 'Videos uploaded, but the course could not be created'))
+      }
+    }
     setRunning(false)
     await onComplete()
   }

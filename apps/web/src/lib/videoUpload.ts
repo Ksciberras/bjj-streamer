@@ -31,9 +31,9 @@ export async function uploadVideo({ file, thumbnail, metadata, onProgress }: Upl
   })
 
   await uploadToStorage(body.upload_url, file, onProgress)
-  await api(`/api/videos/${body.video.id}/complete`, { method: 'POST', body: '{}' })
+  const completed = await api(`/api/videos/${body.video.id}/complete`, { method: 'POST', body: '{}' })
 
-  if (!thumbnail) return { thumbnailSaved: false }
+  if (!thumbnail) return { thumbnailSaved: false, video: completed.video }
   try {
     const thumbnailUpload = await api(
       `/api/videos/${body.video.id}/thumbnail-upload-request`,
@@ -51,8 +51,8 @@ export async function uploadVideo({ file, thumbnail, metadata, onProgress }: Upl
       method: 'POST',
       body: '{}',
     })
-    return { thumbnailSaved: true }
+    return { thumbnailSaved: true, video: completed.video }
   } catch {
-    return { thumbnailSaved: false }
+    return { thumbnailSaved: false, video: completed.video }
   }
 }

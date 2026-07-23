@@ -32,8 +32,9 @@ Administrators can also use **Course batch** on the Upload screen to select
 multiple MP4s, enter shared course metadata once, review filename-derived
 titles, and upload two files at a time. Each file still uses its own existing
 presigned PUT and can be retried independently; this is not multipart or
-resumable upload. Numbered filename prefixes are retained so selecting
-**Title A–Z** in the Library preserves course order.
+resumable upload. A successful batch becomes an ordered course. **Build from
+library** creates and reorders a course from ready videos the current admin can
+manage. Courses preserve each video's existing visibility and ownership.
 
 An uploader may also select a JPEG, PNG, or WebP thumbnail up to 5 MiB while
 creating a video, or replace it later from video management. Thumbnail bytes
@@ -42,7 +43,7 @@ and issued only after the API confirms that the current user can view the
 associated video. Existing videos without thumbnails continue to use the
 standard RollStudy placeholder.
 
-Select **Watch** to request an authorized short-lived playback URL. The native browser player resumes from your saved position, saves periodically and when paused or left, and supports private timestamped notes. Selecting a note seeks the player to that timestamp. Progress and notes are isolated per user.
+Select **Watch** to request an authorized short-lived playback URL. The native browser player resumes from your saved position, saves periodically and when paused or left, and supports private timestamped notes. Selecting a note seeks the player to that timestamp. Progress and notes are isolated per user. Course playback provides ordered previous/next navigation and attempts to play the next accessible chapter automatically; browsers that block autoplay show an explicit play action.
 
 Stop the application without deleting PostgreSQL data:
 
@@ -100,7 +101,7 @@ extensions, enforce the 5 MiB limit, and verify stored metadata.
 
 Authentication uses Argon2id passwords, random server-side sessions stored only as token hashes, strict SameSite cookies, CSRF tokens for state-changing authenticated requests, and an in-process login limiter. The limiter resets when the API restarts and is suitable only for the single-Droplet MVP.
 
-The database still contains the older invitation, personal/shared library, membership, and append-only audit structures. They are retained for migration and stored-data compatibility. Invitation endpoints are inactive, and library/audit management is no longer part of the primary frontend journey. Do not edit migrations `000001` through `000003`; use a new migration for future schema changes.
+The database still contains the older invitation, personal/shared library, membership, and append-only audit structures. They are retained for migration and stored-data compatibility. Invitation endpoints are inactive, and library/audit management is no longer part of the primary frontend journey. Applied migrations remain immutable; ordered courses are introduced by migration `000008`.
 
 ## Verification
 

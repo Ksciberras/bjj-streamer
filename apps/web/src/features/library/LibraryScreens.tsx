@@ -1,7 +1,7 @@
 import { type FormEvent, useState } from 'react'
 import { EmptyState, Filter, LoadingSkeleton, PageHeader, SectionHeading, Visibility } from '../../components/ui'
 import { formatTime, initials } from '../../lib/format'
-import type { ProgressMap, Video } from '../../types'
+import type { CourseSummary, ProgressMap, Video } from '../../types'
 
 type OpenVideo = (video: Video) => void
 type Browse = (filter: { instructor?: string; tag?: string }) => void
@@ -44,7 +44,7 @@ export function HomeScreen({ videos, progress, loading, openVideo, browse }: { v
   </div>
 }
 
-export function LibraryScreen({ videos, progress, loading, initialFilter, openVideo, onSearch }: { videos: Video[]; progress: ProgressMap; loading: boolean; initialFilter: { instructor?: string; tag?: string }; openVideo: OpenVideo; onSearch: (query: string) => Promise<void> }) {
+export function LibraryScreen({ videos, courses = [], progress, loading, initialFilter, openVideo, openCourse, onSearch }: { videos: Video[]; courses?: CourseSummary[]; progress: ProgressMap; loading: boolean; initialFilter: { instructor?: string; tag?: string }; openVideo: OpenVideo; openCourse: (course: CourseSummary) => void; onSearch: (query: string) => Promise<void> }) {
   const [query, setQuery] = useState('')
   const [instructor, setInstructor] = useState(initialFilter.instructor ?? '')
   const [instructional, setInstructional] = useState('')
@@ -98,6 +98,21 @@ export function LibraryScreen({ videos, progress, loading, initialFilter, openVi
   const hasFilters = Boolean(query || instructor || instructional || tag || visibility || studyState)
   return <div className="screen">
     <PageHeader title="Library" description={`${filtered.length} accessible ${filtered.length === 1 ? 'video' : 'videos'}`} />
+    {courses.length > 0 && (
+      <section className="course-shelf" aria-labelledby="courses-title">
+        <SectionHeading id="courses-title" title="Courses" />
+        <div className="course-grid">
+          {courses.map((course) => (
+            <button type="button" className="course-card" key={course.id} onClick={() => openCourse(course)}>
+              <span className="course-card-count">{course.video_count} {course.video_count === 1 ? 'chapter' : 'chapters'}</span>
+              <strong>{course.title}</strong>
+              <span>{course.instructor_name}</span>
+              <span className="course-card-action">Start course →</span>
+            </button>
+          ))}
+        </div>
+      </section>
+    )}
     <form className="library-tools" onSubmit={search} role="search">
       <label className="search-field">
         <span className="sr-only">Search videos</span>

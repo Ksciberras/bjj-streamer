@@ -7,6 +7,7 @@ import { uploadVideo, type VideoMetadata } from '../../lib/videoUpload'
 import type { User, Video } from '../../types'
 import { ManageVideos } from '../videos/ManageVideos'
 import { BatchUploadForm } from './BatchUploadForm'
+import { CourseBuilder } from './CourseBuilder'
 
 type UploadScreenProps = {
   user: User
@@ -27,7 +28,7 @@ export function UploadScreen({
   const [thumbnail, setThumbnail] = useState<File | null>(null)
   const [progress, setProgress] = useState<number | null>(null)
   const [state, setState] = useState<'idle' | 'preparing' | 'uploading' | 'success' | 'error'>('idle')
-  const [mode, setMode] = useState<'single' | 'batch'>('single')
+  const [mode, setMode] = useState<'single' | 'batch' | 'course'>('single')
 
   async function upload(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -99,9 +100,12 @@ export function UploadScreen({
             <div className="upload-mode" role="group" aria-label="Upload mode">
               <button type="button" className={mode === 'single' ? 'active' : ''} onClick={() => setMode('single')}>Single video</button>
               <button type="button" className={mode === 'batch' ? 'active' : ''} onClick={() => setMode('batch')}>Course batch</button>
+              <button type="button" className={mode === 'course' ? 'active' : ''} onClick={() => setMode('course')}>Build from library</button>
             </div>
           )}
-          {mode === 'batch' && user.role === 'admin'
+          {mode === 'course' && user.role === 'admin'
+            ? <CourseBuilder videos={manageable} onComplete={onUploaded} onError={onError} />
+            : mode === 'batch' && user.role === 'admin'
             ? <BatchUploadForm onComplete={onUploaded} onError={onError} />
             : <form className="upload-form" onSubmit={upload}>
             <div className="form-step">

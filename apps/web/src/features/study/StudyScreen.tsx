@@ -2,16 +2,19 @@ import { type FormEvent, useEffect, useMemo, useRef, useState } from 'react'
 import { EmptyState, ErrorState, Visibility } from '../../components/ui'
 import { api, errorMessage } from '../../lib/api'
 import { formatTime } from '../../lib/format'
-import type { Note, Video } from '../../types'
+import type { Course, CourseVideo, Note, Video } from '../../types'
 
 type StudyScreenProps = {
   video: Video
   onBack: () => void
   setError: (message: string) => void
   onProgress: (seconds: number) => void
+  course: Course | null
+  autoPlay: boolean
+  onSelectCourseVideo: (video: CourseVideo, autoPlay?: boolean) => void
 }
 
-export function StudyScreen({ video, onBack, setError, onProgress }: StudyScreenProps) {
+export function StudyScreen({ video, course, autoPlay, onSelectCourseVideo, onBack, setError, onProgress }: StudyScreenProps) {
   const player = useRef<HTMLVideoElement>(null)
   const noteInput = useRef<HTMLTextAreaElement>(null)
   const lastSaved = useRef(0)
@@ -20,6 +23,10 @@ export function StudyScreen({ video, onBack, setError, onProgress }: StudyScreen
   const [notes, setNotes] = useState<Note[]>([])
   const [draftTimestamp, setDraftTimestamp] = useState(0)
   const [loading, setLoading] = useState(true)
+  const [autoplayBlocked, setAutoplayBlocked] = useState(false)
+  const courseIndex = course?.videos.findIndex((item) => item.id === video.id) ?? -1
+  const previousVideo = courseIndex > 0 ? course?.videos[courseIndex - 1] : undefined
+  const nextVideo = course && courseIndex >= 0 ? course.videos[courseIndex + 1] : undefined
 
   useEffect(() => {
     let cancelled = false
@@ -36,6 +43,7 @@ export function StudyScreen({ video, onBack, setError, onProgress }: StudyScreen
       setDraftTimestamp(saved)
       setNotes(noteBody.notes)
       setLoading(false)
+      setAutoplayBlocked(false)
     }).catch((reason) => {
       if (!cancelled) {
         setError(errorMessage(reason, 'Unable to load video'))
@@ -44,6 +52,11 @@ export function StudyScreen({ video, onBack, setError, onProgress }: StudyScreen
     })
     return () => { cancelled = true }
   }, [video.id, setError])
+
+  useEffect(() => {
+    if (!autoPlay || !url || !player.current) return
+    void player.current.play().catch(() => setAutoplayBlocked(true))
+  }, [autoPlay, url])
 
   useEffect(() => {
     const save = () => {
@@ -111,6 +124,11 @@ export function StudyScreen({ video, onBack, setError, onProgress }: StudyScreen
   async function back() {
     await saveProgress().catch(() => undefined)
     onBack()
+  }
+
+  async function advance() {
+    await saveProgress().catch(() => undefined)
+    if (nextVideo) onSelectCourseVideo(nextVideo, true)
   }
 
   async function refreshNotes() {
@@ -184,6 +202,12 @@ export function StudyScreen({ video, onBack, setError, onProgress }: StudyScreen
           resumeAt={resumeAt}
           onTimeUpdate={timeUpdate}
           onPause={saveProgress}
+          onEnded={advance}
+          autoplayBlocked={autoplayBlocked}
+          onResumeAutoplay={() => {
+            setAutoplayBlocked(false)
+            void player.current?.play()
+          }}
         />
         <NotesPanel
           notes={sortedNotes}
@@ -196,6 +220,18 @@ export function StudyScreen({ video, onBack, setError, onProgress }: StudyScreen
           onDelete={deleteNote}
         />
       </div>
+      {course && courseIndex >= 0 && (
+        <nav className="course-navigation" aria-label="Course chapters">
+          <div>
+            <span>Course · Chapter {courseIndex + 1} of {course.videos.length}</span>
+            <strong>{course.title}</strong>
+          </div>
+          <div>
+            <button type="button" className="secondary-button" disabled={!previousVideo} onClick={() => previousVideo && onSelectCourseVideo(previousVideo)}>← Previous</button>
+            <button type="button" disabled={!nextVideo} onClick={() => nextVideo && onSelectCourseVideo(nextVideo)}>Next chapter →</button>
+          </div>
+        </nav>
+      )}
     </div>
   )
 }
@@ -208,9 +244,12 @@ type PlayerProps = {
   resumeAt: number
   onTimeUpdate: () => void
   onPause: () => Promise<void>
+  onEnded: () => Promise<void>
+  autoplayBlocked: boolean
+  onResumeAutoplay: () => void
 }
 
-function Player({ video, player, url, loading, resumeAt, onTimeUpdate, onPause }: PlayerProps) {
+function Player({ video, player, url, loading, resumeAt, onTimeUpdate, onPause, onEnded, autoplayBlocked, onResumeAutoplay }: PlayerProps) {
   return (
     <section className="player-column" aria-labelledby="video-title">
       <div className="player-frame">
@@ -228,8 +267,10 @@ function Player({ video, player, url, loading, resumeAt, onTimeUpdate, onPause }
               }}
               onTimeUpdate={onTimeUpdate}
               onPause={() => void onPause()}
+              onEnded={() => void onEnded()}
             />
             : <ErrorState title="Couldn’t load this video" body="Check your connection and try again." />}
+        {autoplayBlocked && <button className="autoplay-prompt" type="button" onClick={onResumeAutoplay}>Play next chapter</button>}
       </div>
       <div className="player-details">
         <div>
