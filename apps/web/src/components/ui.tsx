@@ -29,6 +29,7 @@ export function TruncatedText({ text, className = '', focusable = true }: { text
     <span
       className={`truncate-tooltip${className ? ` ${className}` : ''}`}
       data-tooltip={text}
+      title={text}
       tabIndex={focusable ? 0 : undefined}
     >
       <span>{text}</span>
