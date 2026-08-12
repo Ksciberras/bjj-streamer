@@ -1,4 +1,4 @@
-import { type FormEvent, useEffect, useMemo, useRef, useState } from 'react'
+import { type CSSProperties, type FormEvent, useEffect, useMemo, useRef, useState } from 'react'
 import { BookmarkIcon, EmptyState, ErrorState, TruncatedText, Visibility } from '../../components/ui'
 import { api, errorMessage } from '../../lib/api'
 import { formatTime } from '../../lib/format'
@@ -275,9 +275,19 @@ type PlayerProps = {
 }
 
 function Player({ video, player, url, loading, resumeAt, onTimeUpdate, onPause, onEnded, autoplayBlocked, onResumeAutoplay, savedForLater, onToggleWatchLater }: PlayerProps) {
+  const [measured, setMeasured] = useState<{ id: string; width: number; height: number } | null>(null)
+  const aspect = measured?.id === video.id
+    ? { width: measured.width, height: measured.height }
+    : { width: 16, height: 9 }
+  const portrait = aspect.height > aspect.width
+  const frameStyle = {
+    '--ar-w': aspect.width,
+    '--ar-h': aspect.height,
+  } as CSSProperties
+
   return (
     <section className="player-column" aria-labelledby="video-title">
-      <div className="player-frame">
+      <div className={`player-frame${portrait ? ' is-portrait' : ''}`} style={frameStyle}>
         {loading
           ? <div className="player-loading"><span aria-hidden="true" /><strong>Preparing video</strong><small>Requesting secure playback…</small></div>
         : url
@@ -289,7 +299,11 @@ function Player({ video, player, url, loading, resumeAt, onTimeUpdate, onPause, 
               playsInline
               preload="metadata"
               onLoadedMetadata={(event) => {
-                if (resumeAt > 0) event.currentTarget.currentTime = resumeAt
+                const media = event.currentTarget
+                if (media.videoWidth > 0 && media.videoHeight > 0) {
+                  setMeasured({ id: video.id, width: media.videoWidth, height: media.videoHeight })
+                }
+                if (resumeAt > 0) media.currentTime = resumeAt
               }}
               onTimeUpdate={onTimeUpdate}
               onPause={() => void onPause()}
