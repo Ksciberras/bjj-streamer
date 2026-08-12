@@ -23,7 +23,7 @@ export type Video = {
   chapter_name?: string
   description: string
   tags: string[]
-  visibility: 'shared' | 'private'
+  visibility: 'shared' | 'private' | 'instructors'
   content_basis: 'self_created' | 'licensed_for_group' | 'personal_purchase'
   original_filename: string
   thumbnail_url?: string

@@ -182,6 +182,7 @@ export function UploadScreen({
                   Visibility
                   <select name="visibility">
                     <option value="shared">Shared with members</option>
+                    <option value="instructors">Instructors only</option>
                     <option value="private">Private video</option>
                   </select>
                 </label>

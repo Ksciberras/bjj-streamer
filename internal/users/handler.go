@@ -22,6 +22,7 @@ func (h *Handler) Register(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/admin/users", h.list)
 	mux.HandleFunc("POST /api/admin/users", h.create)
 	mux.HandleFunc("PATCH /api/admin/users/{id}", h.update)
+	mux.HandleFunc("DELETE /api/admin/users/{id}", h.remove)
 	mux.HandleFunc("POST /api/admin/users/{id}/password", h.resetPassword)
 	mux.HandleFunc("POST /api/admin/users/{id}/sessions/revoke", h.revoke)
 }
@@ -140,6 +141,30 @@ func (h *Handler) update(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"user": user})
+}
+func (h *Handler) remove(w http.ResponseWriter, r *http.Request) {
+	session, ok := h.actor(w, r, true)
+	if !ok {
+		return
+	}
+	if !session.User.IsPlatformOwner {
+		notFound(w)
+		return
+	}
+	err := h.store.Delete(r.Context(), session.User.ID, r.PathValue("id"), r.Header.Get("X-Request-ID"))
+	if err == ErrNotFound {
+		notFound(w)
+		return
+	}
+	if err == ErrLastAdmin || err == ErrConflict || err == ErrDependentRecords {
+		badRequest(w, err.Error())
+		return
+	}
+	if err != nil {
+		serverError(w)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
 }
 func (h *Handler) revoke(w http.ResponseWriter, r *http.Request) {
 	session, ok := h.actor(w, r, true)

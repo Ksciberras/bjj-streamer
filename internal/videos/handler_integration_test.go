@@ -164,6 +164,29 @@ func TestUploadAuthorizationCompletionVisibilityAndSearch(t *testing.T) {
 	if response := serveVideo(mux, videoRequest(t, http.MethodGet, "/api/videos?q=armbar", nil, admin)); response.Code != http.StatusOK || !bytes.Contains(response.Body.Bytes(), []byte("Armbar Study")) {
 		t.Fatalf("admin missing private: %d %s", response.Code, response.Body.String())
 	}
+	instructorsBody := map[string]any{"title": "Coach Room", "instructor_name": "Coach", "description": "", "tags": []string{"coaching"}, "visibility": "instructors", "content_basis": "self_created", "filename": "coach.mp4", "mime_type": "video/mp4", "byte_size": 1024}
+	instructorsCreated := serveVideo(mux, videoRequest(t, http.MethodPost, "/api/videos/upload-requests", instructorsBody, instructor))
+	if instructorsCreated.Code != http.StatusCreated {
+		t.Fatalf("instructors create=%d %s", instructorsCreated.Code, instructorsCreated.Body.String())
+	}
+	var instructorsPayload struct {
+		Video Video `json:"video"`
+	}
+	if err = json.Unmarshal(instructorsCreated.Body.Bytes(), &instructorsPayload); err != nil {
+		t.Fatal(err)
+	}
+	if response := serveVideo(mux, videoRequest(t, http.MethodPost, "/api/videos/"+instructorsPayload.Video.ID+"/complete", map[string]any{}, instructor)); response.Code != http.StatusOK {
+		t.Fatalf("instructors complete=%d %s", response.Code, response.Body.String())
+	}
+	if response := serveVideo(mux, videoRequest(t, http.MethodGet, "/api/videos?q=Coach+Room", nil, student)); response.Code != http.StatusOK || bytes.Contains(response.Body.Bytes(), []byte("Coach Room")) {
+		t.Fatalf("instructors leaked to student: %d %s", response.Code, response.Body.String())
+	}
+	if response := serveVideo(mux, videoRequest(t, http.MethodGet, "/api/videos?q=Coach+Room", nil, other)); response.Code != http.StatusOK || !bytes.Contains(response.Body.Bytes(), []byte("Coach Room")) {
+		t.Fatalf("other instructor missing instructors video: %d %s", response.Code, response.Body.String())
+	}
+	if response := serveVideo(mux, videoRequest(t, http.MethodGet, "/api/videos?q=Coach+Room", nil, admin)); response.Code != http.StatusOK || !bytes.Contains(response.Body.Bytes(), []byte("Coach Room")) {
+		t.Fatalf("admin missing instructors video: %d %s", response.Code, response.Body.String())
+	}
 	body["title"] = "Forbidden"
 	body["visibility"] = "shared"
 	body["content_basis"] = "personal_purchase"

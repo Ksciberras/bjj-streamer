@@ -116,11 +116,15 @@ func TestVideoVisibilityAndOwnership(t *testing.T) {
 	student := Actor{ID: "student", Role: Student}
 	shared := Video{UploaderID: instructor.ID, Visibility: SharedVideo, Ready: true}
 	private := Video{UploaderID: instructor.ID, Visibility: PrivateVideo, Ready: true}
+	instructorsOnly := Video{UploaderID: instructor.ID, Visibility: InstructorsVideo, Ready: true}
 	if !p.CreateVideo(admin) || !p.CreateVideo(instructor) || p.CreateVideo(student) {
 		t.Fatal("video creation role policy failed")
 	}
 	if !p.ViewVideo(student, shared) || p.ViewVideo(student, private) || !p.ViewVideo(admin, private) || !p.ViewVideo(instructor, private) {
 		t.Fatal("video visibility policy failed")
+	}
+	if p.ViewVideo(student, instructorsOnly) || !p.ViewVideo(instructor, instructorsOnly) || !p.ViewVideo(other, instructorsOnly) || !p.ViewVideo(admin, instructorsOnly) {
+		t.Fatal("instructors-only visibility policy failed")
 	}
 	if !p.ManageVideo(admin, private) || !p.ManageVideo(instructor, private) || p.ManageVideo(other, private) || p.ManageVideo(student, shared) {
 		t.Fatal("video management policy failed")

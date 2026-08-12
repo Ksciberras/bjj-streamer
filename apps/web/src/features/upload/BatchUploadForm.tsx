@@ -139,6 +139,7 @@ export function BatchUploadForm({ onComplete, onError }: BatchUploadFormProps) {
           Visibility
           <select name="visibility" disabled={running}>
             <option value="shared">Shared with members</option>
+            <option value="instructors">Instructors only</option>
             <option value="private">Private video</option>
           </select>
         </label>

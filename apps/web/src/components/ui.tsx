@@ -82,9 +82,12 @@ export function Dialog({ title, description, onClose, children }: { title: strin
 }
 
 export function Visibility({ value }: { value: Video['visibility'] }) {
-  return <span className={`visibility ${value}`}>
-    {value === 'private' ? 'Private video' : 'Shared with members'}
-  </span>
+  const label = value === 'private'
+    ? 'Private video'
+    : value === 'instructors'
+      ? 'Instructors only'
+      : 'Shared with members'
+  return <span className={`visibility ${value}`}>{label}</span>
 }
 
 export function BookmarkIcon({ filled = false }: { filled?: boolean }) {

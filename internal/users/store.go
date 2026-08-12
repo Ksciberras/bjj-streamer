@@ -15,6 +15,7 @@ import (
 var ErrNotFound = errors.New("not found")
 var ErrLastAdmin = errors.New("cannot remove final enabled administrator")
 var ErrConflict = errors.New("conflict")
+var ErrDependentRecords = errors.New("cannot remove user with dependent records")
 
 type User struct {
 	ID              string    `json:"id"`
@@ -275,6 +276,97 @@ func (s *Store) Update(ctx context.Context, actorID, targetID string, role *stri
 		return User{}, err
 	}
 	return updated, nil
+}
+
+func (s *Store) Delete(ctx context.Context, actorID, targetID, requestID string) error {
+	tx, err := s.db.BeginTx(ctx, pgx.TxOptions{IsoLevel: pgx.Serializable})
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback(ctx)
+
+	var actorIsPlatformOwner bool
+	if err = tx.QueryRow(ctx, `SELECT is_platform_owner FROM users WHERE id=$1`, actorID).Scan(&actorIsPlatformOwner); err != nil || !actorIsPlatformOwner {
+		return ErrNotFound
+	}
+
+	var current User
+	err = tx.QueryRow(ctx, `SELECT id,email,role,organization_id,is_platform_owner,disabled_at IS NOT NULL,created_at FROM users WHERE id=$1 FOR UPDATE`, targetID).
+		Scan(&current.ID, &current.Email, &current.Role, &current.OrganizationID, &current.IsPlatformOwner, &current.Disabled, &current.CreatedAt)
+	if errors.Is(err, pgx.ErrNoRows) || current.IsPlatformOwner {
+		return ErrNotFound
+	}
+	if err != nil {
+		return err
+	}
+
+	if current.Role == "admin" && !current.Disabled && current.OrganizationID != nil {
+		var enabledAdmins int
+		err = tx.QueryRow(ctx, `SELECT count(*) FROM (SELECT id FROM users WHERE organization_id=$1 AND role='admin' AND disabled_at IS NULL FOR UPDATE) enabled_admins`, current.OrganizationID).Scan(&enabledAdmins)
+		if err != nil {
+			return err
+		}
+		if enabledAdmins <= 1 {
+			return ErrLastAdmin
+		}
+	}
+
+	var hasDependencies bool
+	if err = tx.QueryRow(ctx, `
+		SELECT EXISTS(
+			SELECT 1
+			FROM (
+				SELECT uploaded_by_user_id AS user_id FROM videos
+				UNION ALL
+				SELECT created_by_user_id AS user_id FROM courses
+				UNION ALL
+				SELECT created_by AS user_id FROM libraries WHERE owner_user_id IS NULL
+				UNION ALL
+				SELECT actor_user_id AS user_id FROM audit_events
+			) dependencies
+			WHERE user_id = $1
+		)`, targetID).Scan(&hasDependencies); err != nil {
+		return err
+	}
+	if hasDependencies {
+		return ErrDependentRecords
+	}
+
+	if _, err = tx.Exec(ctx, `DELETE FROM invitations WHERE invited_by=$1`, targetID); err != nil {
+		return err
+	}
+	if _, err = tx.Exec(ctx, `DELETE FROM library_members WHERE user_id=$1`, targetID); err != nil {
+		return err
+	}
+	if _, err = tx.Exec(ctx, `DELETE FROM sessions WHERE user_id=$1`, targetID); err != nil {
+		return err
+	}
+	if _, err = tx.Exec(ctx, `DELETE FROM playback_progress WHERE user_id=$1`, targetID); err != nil {
+		return err
+	}
+	if _, err = tx.Exec(ctx, `DELETE FROM notes WHERE user_id=$1`, targetID); err != nil {
+		return err
+	}
+	if _, err = tx.Exec(ctx, `DELETE FROM watch_later WHERE user_id=$1`, targetID); err != nil {
+		return err
+	}
+	if _, err = tx.Exec(ctx, `DELETE FROM learning_events WHERE user_id=$1`, targetID); err != nil {
+		return err
+	}
+	if _, err = tx.Exec(ctx, `DELETE FROM libraries WHERE owner_user_id=$1`, targetID); err != nil {
+		return err
+	}
+	result, err := tx.Exec(ctx, `DELETE FROM users WHERE id=$1`, targetID)
+	if err != nil {
+		return err
+	}
+	if result.RowsAffected() == 0 {
+		return ErrNotFound
+	}
+	if err = audit.Record(ctx, tx, actorID, "user.deleted", "user", targetID, requestID, map[string]any{"email": current.Email, "role": current.Role}); err != nil {
+		return err
+	}
+	return tx.Commit(ctx)
 }
 
 func (s *Store) RevokeSessions(ctx context.Context, actorID, targetID, requestID string) error {

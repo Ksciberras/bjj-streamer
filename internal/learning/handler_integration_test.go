@@ -100,6 +100,7 @@ func TestPlaybackAuthorizationAndLearningIsolation(t *testing.T) {
 	}
 	sharedID := readyVideo(t, pool, instructor, "shared")
 	privateID := readyVideo(t, pool, instructor, "private")
+	instructorsID := readyVideo(t, pool, instructor, "instructors")
 	var ownerOnlyID string
 	if err := pool.QueryRow(context.Background(), `INSERT INTO videos(uploaded_by_user_id,title,instructor_name,visibility,content_basis,object_key,original_filename,mime_type,byte_size,status)
 		VALUES($1,'Platform-only activity','Coach','shared','self_created','owner-only.mp4','owner-only.mp4','video/mp4',10,'ready') RETURNING id`, instructor.id).Scan(&ownerOnlyID); err != nil {
@@ -117,6 +118,12 @@ func TestPlaybackAuthorizationAndLearningIsolation(t *testing.T) {
 	}
 	if response := learningResponse(mux, learningRequest(t, http.MethodGet, "/api/videos/"+privateID+"/playback", nil, first)); response.Code != http.StatusNotFound {
 		t.Fatalf("private playback=%d", response.Code)
+	}
+	if response := learningResponse(mux, learningRequest(t, http.MethodGet, "/api/videos/"+instructorsID+"/playback", nil, first)); response.Code != http.StatusNotFound {
+		t.Fatalf("instructors playback to student=%d", response.Code)
+	}
+	if response := learningResponse(mux, learningRequest(t, http.MethodGet, "/api/videos/"+instructorsID+"/playback", nil, instructor)); response.Code != http.StatusOK || !bytes.Contains(response.Body.Bytes(), []byte("playback_url")) {
+		t.Fatalf("instructors playback=%d %s", response.Code, response.Body.String())
 	}
 	for _, item := range []struct {
 		who      learner

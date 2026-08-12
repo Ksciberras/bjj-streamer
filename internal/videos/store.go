@@ -129,7 +129,7 @@ func (s *Store) Get(ctx context.Context, id string) (Video, error) {
 
 func (s *Store) List(ctx context.Context, userID, role string, organizationID *string, platformOwner bool, query string) ([]Video, error) {
 	like := "%" + query + "%"
-	rows, err := s.db.Query(ctx, `SELECT `+columns+` FROM videos v WHERE status='ready' AND ($4 OR ((EXISTS(SELECT 1 FROM video_organizations vo WHERE vo.video_id=v.id AND vo.organization_id=$3) OR EXISTS(SELECT 1 FROM course_videos cv JOIN course_organizations co ON co.course_id=cv.course_id WHERE cv.video_id=v.id AND co.organization_id=$3)) AND (visibility='shared' OR uploaded_by_user_id=$1 OR $2='admin'))) AND ($5='' OR title ILIKE $6 OR instructor_name ILIKE $6 OR COALESCE(instructional_name,'') ILIKE $6 OR array_to_string(tags,',') ILIKE $6) ORDER BY created_at DESC,id`, userID, role, organizationID, platformOwner, query, like)
+	rows, err := s.db.Query(ctx, `SELECT `+columns+` FROM videos v WHERE status='ready' AND ($4 OR ((EXISTS(SELECT 1 FROM video_organizations vo WHERE vo.video_id=v.id AND vo.organization_id=$3) OR EXISTS(SELECT 1 FROM course_videos cv JOIN course_organizations co ON co.course_id=cv.course_id WHERE cv.video_id=v.id AND co.organization_id=$3)) AND (visibility='shared' OR uploaded_by_user_id=$1 OR $2='admin' OR (visibility='instructors' AND $2='instructor')))) AND ($5='' OR title ILIKE $6 OR instructor_name ILIKE $6 OR COALESCE(instructional_name,'') ILIKE $6 OR array_to_string(tags,',') ILIKE $6) ORDER BY created_at DESC,id`, userID, role, organizationID, platformOwner, query, like)
 	if err != nil {
 		return nil, err
 	}
@@ -156,7 +156,7 @@ func (s *Store) CanView(ctx context.Context, video Video, userID, role string, o
 	if organizationID == nil || s.db.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM video_organizations WHERE video_id=$1 AND organization_id=$2) OR EXISTS(SELECT 1 FROM course_videos cv JOIN course_organizations co ON co.course_id=cv.course_id WHERE cv.video_id=$1 AND co.organization_id=$2)`, video.ID, organizationID).Scan(&available) != nil || !available {
 		return false
 	}
-	return video.Visibility == "shared" || video.UploadedByUserID == userID || role == "admin"
+	return video.Visibility == "shared" || video.UploadedByUserID == userID || role == "admin" || (video.Visibility == "instructors" && role == "instructor")
 }
 
 func (s *Store) CanManage(video Video, userID, role string, organizationID *string, platformOwner bool) bool {

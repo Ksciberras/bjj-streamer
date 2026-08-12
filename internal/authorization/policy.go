@@ -19,6 +19,7 @@ const (
 	PersonalPurchase ContentBasis    = "personal_purchase"
 	SharedVideo      Visibility      = "shared"
 	PrivateVideo     Visibility      = "private"
+	InstructorsVideo Visibility      = "instructors"
 )
 
 type Actor struct {
@@ -143,7 +144,13 @@ func (Policy) ViewVideo(actor Actor, video Video) bool {
 	if actor.Disabled || !video.Ready {
 		return false
 	}
-	return video.Visibility == SharedVideo || actor.Role == Admin || video.UploaderID == actor.ID
+	if video.Visibility == SharedVideo {
+		return true
+	}
+	if video.Visibility == InstructorsVideo {
+		return actor.Role == Admin || actor.Role == Instructor
+	}
+	return actor.Role == Admin || video.UploaderID == actor.ID
 }
 
 func activeAdmin(actor Actor) bool { return !actor.Disabled && actor.Role == Admin }

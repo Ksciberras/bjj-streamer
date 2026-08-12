@@ -124,7 +124,7 @@ export function ManageVideos({ videos, onUpdate, onError }: ManageVideosProps) {
           <label>Chapter<input name="chapter_name" defaultValue={editingVideo.chapter_name} /></label>
           <label className="dialog-full">Description<textarea name="description" defaultValue={editingVideo.description} /></label>
           <label className="dialog-full">Tags, comma separated<input name="tags" defaultValue={editingVideo.tags.join(', ')} /></label>
-          <label>Visibility<select name="visibility" defaultValue={editingVideo.visibility}><option value="shared">Shared</option><option value="private">Private</option></select></label>
+          <label>Visibility<select name="visibility" defaultValue={editingVideo.visibility}><option value="shared">Shared with members</option><option value="instructors">Instructors only</option><option value="private">Private</option></select></label>
           <label>Content basis<select name="content_basis" defaultValue={editingVideo.content_basis}><option value="self_created">Self-created</option><option value="licensed_for_group">Licensed</option><option value="personal_purchase">Personal purchase</option></select></label>
           <label className="dialog-full">Replace thumbnail<input type="file" accept="image/jpeg,image/png,image/webp,.jpg,.jpeg,.png,.webp" onChange={(event) => { const file = event.target.files?.[0]; if (file) void uploadThumbnail(editingVideo, file) }} /></label>
         </div>

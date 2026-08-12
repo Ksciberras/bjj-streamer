@@ -149,7 +149,7 @@ export function LibraryScreen({ videos, courses = [], progress, loading, initial
         <Filter label="Instructor" value={instructor} onChange={setInstructor} options={instructors} />
         <Filter label="Instructional" value={instructional} onChange={setInstructional} options={instructionals} />
         <Filter label="Tag" value={tag} onChange={setTag} options={tags} />
-        <Filter label="Visibility" value={visibility} onChange={setVisibility} options={['shared', 'private']} />
+        <Filter label="Visibility" value={visibility} onChange={setVisibility} options={['shared', 'private', 'instructors']} />
         <Filter label="Progress" value={studyState} onChange={setStudyState} options={['started', 'not started']} />
         {hasFilters && <button type="button" className="text-button" onClick={clearFilters}>Clear filters</button>}
       </div>

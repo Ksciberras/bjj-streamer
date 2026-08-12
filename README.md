@@ -36,7 +36,7 @@ docker compose run --rm --entrypoint /bootstrap-admin api --email you@example.co
 
 Sign in through the browser. Administrators can create known user accounts, assign `admin`, `instructor`, or `student` roles, disable accounts, and reset passwords. Password resets and authorization changes revoke the affected user’s active sessions.
 
-Administrators and instructors can upload browser-compatible `.mp4` files up to 5 GiB. The browser uploads bytes directly to object storage; they do not pass through the Go API. Students cannot request uploads. Shared ready videos appear to every authenticated user, while private videos appear only to their uploader and administrators. `personal_purchase` videos must be private.
+Administrators and instructors can upload browser-compatible `.mp4` files up to 5 GiB. The browser uploads bytes directly to object storage; they do not pass through the Go API. Students cannot request uploads. Shared ready videos appear to every authenticated gym member. Instructors-only videos appear to administrators and instructors. Private videos appear only to their uploader and administrators. `personal_purchase` videos must be private.
 
 Administrators can also use **Course batch** in the Content workspace to select
 multiple MP4s, enter shared course metadata once, review filename-derived
@@ -122,7 +122,7 @@ extensions, enforce the 5 MiB limit, and verify stored metadata.
 
 Authentication uses Argon2id passwords, random server-side sessions stored only as token hashes, strict SameSite cookies, CSRF tokens for state-changing authenticated requests, and an in-process login limiter. The limiter resets when the API restarts and is suitable only for the single-Droplet MVP.
 
-The database still contains the older invitation, personal/shared library, membership, and append-only audit structures. They are retained for migration and stored-data compatibility. Invitation and legacy library endpoints are inactive, and library/audit management is no longer part of the primary frontend journey. Applied migrations remain immutable; ordered courses are introduced by migration `000008`, private Watch Later entries by `000009`, gym isolation by `000010`, and minimal learning analytics by `000011`.
+The database still contains the older invitation, personal/shared library, membership, and append-only audit structures. They are retained for migration and stored-data compatibility. Invitation and legacy library endpoints are inactive, and library/audit management is no longer part of the primary frontend journey. Applied migrations remain immutable; ordered courses are introduced by migration `000008`, private Watch Later entries by `000009`, gym isolation by `000010`, minimal learning analytics by `000011`, and instructors-only video visibility by `000012`.
 
 Migration `000010` deliberately stops if `kyranu2@gmail.com` or
 `info@bjjcork.com` is missing. It promotes the first account to platform owner,

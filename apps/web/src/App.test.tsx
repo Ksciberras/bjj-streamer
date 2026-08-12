@@ -1,5 +1,5 @@
 import '@testing-library/jest-dom/vitest'
-import { cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { App } from './App'
 
@@ -128,5 +128,39 @@ describe('App', () => {
     expect(await screen.findByRole('combobox', { name: 'Gym' })).toHaveValue('')
     expect(screen.getByRole('option', { name: 'All gyms' })).toBeInTheDocument()
     expect(screen.getByRole('option', { name: 'BJJ Cork' })).toBeInTheDocument()
+  })
+
+  it('splits platform-owner member edits into authorization and gym requests', async () => {
+    const fetchMock = vi.fn().mockImplementation(async (input: string, init?: RequestInit) => {
+      if (input === '/api/auth/session') return { ok: true, status: 200, json: async () => ({ user: { id: 'owner', email: 'kyranu2@gmail.com', role: 'admin', is_platform_owner: true } }) }
+      if (input === '/api/platform/organizations') return { ok: true, status: 200, json: async () => ({ organizations: [{ id: 'gym-1', name: 'BJJ Cork', slug: 'bjj-cork' }, { id: 'gym-2', name: 'Northside', slug: 'northside' }] }) }
+      if (input === '/api/platform/availability') return { ok: true, status: 200, json: async () => ({ videos: [], courses: [] }) }
+      if (input.startsWith('/api/analytics')) return { ok: true, status: 200, json: async () => ({ analytics: { days: 30, overview: { active_learners: 0, videos_started: 0, resumes: 0, notes_created: 0 }, content: [], members: [] } }) }
+      if (input === '/api/admin/users' && (!init || init.method === undefined)) return { ok: true, status: 200, json: async () => ({ users: [{ id: 'member-1', email: 'member@example.com', role: 'student', organization_id: 'gym-1', disabled: false }] }) }
+      if (input === '/api/admin/users/member-1' && init?.method === 'PATCH') return { ok: true, status: 200, json: async () => ({ user: {} }) }
+      if (input === '/api/courses') return { ok: true, status: 200, json: async () => ({ courses: [] }) }
+      if (input === '/api/study') return { ok: true, status: 200, json: async () => ({ watch_later: [], notes: [] }) }
+      return { ok: true, status: 200, json: async () => ({ videos: [] }) }
+    })
+    vi.stubGlobal('fetch', fetchMock)
+    render(<App />)
+
+    fireEvent.click((await screen.findAllByRole('button', { name: 'Admin' }))[0])
+    fireEvent.click(screen.getByRole('button', { name: 'Edit' }))
+    const dialog = screen.getByRole('dialog', { name: 'Edit member' })
+    fireEvent.change(within(dialog).getByRole('combobox', { name: 'Role' }), { target: { value: 'instructor' } })
+    fireEvent.change(within(dialog).getByRole('combobox', { name: 'Gym' }), { target: { value: 'gym-2' } })
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Save changes' }))
+
+    await waitFor(() => {
+      const patchBodies = fetchMock.mock.calls
+        .filter(([path, init]) => path === '/api/admin/users/member-1' && init?.method === 'PATCH')
+        .map(([, init]) => JSON.parse(String(init?.body)))
+
+      expect(patchBodies).toEqual([
+        { role: 'instructor', disabled: false },
+        { organization_id: 'gym-2' },
+      ])
+    })
   })
 })

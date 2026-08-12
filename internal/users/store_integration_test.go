@@ -172,3 +172,48 @@ func TestPlatformOwnerMovesAccountAndRevokesSessions(t *testing.T) {
 		t.Fatalf("audit count=%d err=%v", auditCount, err)
 	}
 }
+
+func TestPlatformOwnerDeletesUnusedAccount(t *testing.T) {
+	store, pool := testStore(t)
+	var ownerID, targetID string
+	if err := pool.QueryRow(context.Background(), `INSERT INTO users(email,password_hash,role,is_platform_owner)VALUES('owner@example.com','hash','admin',TRUE)RETURNING id`).Scan(&ownerID); err != nil {
+		t.Fatal(err)
+	}
+	if err := pool.QueryRow(context.Background(), `INSERT INTO users(email,password_hash,role)VALUES('target@example.com','hash','student')RETURNING id`).Scan(&targetID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := pool.Exec(context.Background(), `INSERT INTO sessions(user_id,token_hash,csrf_hash,expires_at,idle_expires_at)VALUES($1,$2,$3,$4,$4)`, targetID, make([]byte, 32), make([]byte, 32), time.Now().Add(time.Hour)); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := store.Delete(context.Background(), ownerID, targetID, "delete-request"); err != nil {
+		t.Fatal(err)
+	}
+
+	var exists bool
+	if err := pool.QueryRow(context.Background(), `SELECT EXISTS(SELECT 1 FROM users WHERE id=$1)`, targetID).Scan(&exists); err != nil || exists {
+		t.Fatalf("user exists=%t err=%v", exists, err)
+	}
+	var libraryCount int
+	if err := pool.QueryRow(context.Background(), `SELECT count(*) FROM libraries WHERE owner_user_id=$1`, targetID).Scan(&libraryCount); err != nil || libraryCount != 0 {
+		t.Fatalf("personal library count=%d err=%v", libraryCount, err)
+	}
+}
+
+func TestPlatformOwnerCannotDeleteAccountWithDependentRecords(t *testing.T) {
+	store, pool := testStore(t)
+	var ownerID, targetID string
+	if err := pool.QueryRow(context.Background(), `INSERT INTO users(email,password_hash,role,is_platform_owner)VALUES('owner@example.com','hash','admin',TRUE)RETURNING id`).Scan(&ownerID); err != nil {
+		t.Fatal(err)
+	}
+	if err := pool.QueryRow(context.Background(), `INSERT INTO users(email,password_hash,role)VALUES('target@example.com','hash','instructor')RETURNING id`).Scan(&targetID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := pool.Exec(context.Background(), `INSERT INTO videos(uploaded_by_user_id,organization_id,title,instructor_name,visibility,content_basis,object_key,original_filename,mime_type,byte_size,status) VALUES($1,(SELECT organization_id FROM users WHERE id=$1),'Passing','Coach','shared','self_created','target.mp4','target.mp4','video/mp4',10,'ready')`, targetID); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := store.Delete(context.Background(), ownerID, targetID, "delete-request"); !errors.Is(err, ErrDependentRecords) {
+		t.Fatalf("delete err=%v", err)
+	}
+}

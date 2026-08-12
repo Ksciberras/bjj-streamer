@@ -134,6 +134,8 @@ input[type="file"]::file-selector-button { margin-right: .75rem; border: 1px sol
 .visibility::before { width: 5px; height: 5px; margin-right: .4rem; border-radius: 50%; background: var(--subtle); content: ""; }
 .visibility.private { color: #d3ad72; }
 .visibility.private::before { background: var(--warning); }
+.visibility.instructors { color: #8eb4d4; }
+.visibility.instructors::before { background: #6f97b8; }
 .video-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 1rem; }
 .home-discovery-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 2rem; }
 .home-discovery-section { min-width: 0; margin-top: 2.75rem; }

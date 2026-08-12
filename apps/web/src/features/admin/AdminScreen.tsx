@@ -53,16 +53,33 @@ export function AdminScreen({
   async function updateUser(event: FormEvent<HTMLFormElement>, target: User) {
     event.preventDefault()
     const data = new FormData(event.currentTarget)
+    const role = data.get('role')
+    const disabled = data.get('disabled') === 'on'
+    const organizationID = platformOwner && !target.is_platform_owner ? data.get('organization_id') : undefined
 
     try {
-      await api(`/api/admin/users/${target.id}`, {
-        method: 'PATCH',
-        body: JSON.stringify({
-          role: data.get('role'),
-          disabled: data.get('disabled') === 'on',
-          organization_id: platformOwner && !target.is_platform_owner ? data.get('organization_id') : undefined,
-        }),
-      })
+      const roleChanged = role !== target.role
+      const disabledChanged = disabled !== Boolean(target.disabled)
+      const organizationChanged = typeof organizationID === 'string' && organizationID !== ''
+
+      if (roleChanged || disabledChanged) {
+        await api(`/api/admin/users/${target.id}`, {
+          method: 'PATCH',
+          body: JSON.stringify({
+            role,
+            disabled,
+          }),
+        })
+      }
+
+      if (organizationChanged) {
+        await api(`/api/admin/users/${target.id}`, {
+          method: 'PATCH',
+          body: JSON.stringify({
+            organization_id: organizationID,
+          }),
+        })
+      }
 
       const password = data.get('password')
       if (typeof password === 'string' && password) {
@@ -77,6 +94,21 @@ export function AdminScreen({
       setEditingUser(undefined)
     } catch (reason) {
       setError(errorMessage(reason, 'Unable to update user'))
+    }
+  }
+
+  async function removeUser(target: User) {
+    if (!platformOwner || target.is_platform_owner || !window.confirm(`Remove ${target.email}? This deletes the account if it has no dependent records.`)) {
+      return
+    }
+
+    try {
+      await api(`/api/admin/users/${target.id}`, { method: 'DELETE' })
+      await onRefreshUsers()
+      setNotice(`Removed ${target.email}.`)
+      setEditingUser(undefined)
+    } catch (reason) {
+      setError(errorMessage(reason, 'Unable to remove user'))
     }
   }
 
@@ -182,7 +214,11 @@ export function AdminScreen({
             <label className="dialog-full">New password<input name="password" type="password" minLength={12} placeholder="Leave unchanged" autoComplete="new-password" /></label>
             <label className="dialog-check"><input name="disabled" type="checkbox" defaultChecked={editingUser.disabled} /><span>Disable this account</span></label>
           </div>
-          <div className="dialog-actions"><button type="button" className="secondary-button" onClick={() => setEditingUser(undefined)}>Cancel</button><button type="submit">Save changes</button></div>
+          <div className="dialog-actions">
+            {platformOwner && !editingUser.is_platform_owner && <button type="button" className="secondary-button" onClick={() => void removeUser(editingUser)}>Remove user</button>}
+            <button type="button" className="secondary-button" onClick={() => setEditingUser(undefined)}>Cancel</button>
+            <button type="submit">Save changes</button>
+          </div>
         </form>
       </Dialog>}
     </div>

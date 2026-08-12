@@ -327,7 +327,7 @@ func validThumbnailExtension(mime, extension string) bool {
 }
 
 func validMetadata(input metadataInput) bool {
-	if length(input.Title, 1, 200) == false || length(input.InstructorName, 1, 200) == false || len(input.Description) > 10000 || (input.Visibility != "shared" && input.Visibility != "private") || (input.ContentBasis != "self_created" && input.ContentBasis != "licensed_for_group" && input.ContentBasis != "personal_purchase") || (input.ContentBasis == "personal_purchase" && input.Visibility != "private") || len(input.Tags) > 30 {
+	if length(input.Title, 1, 200) == false || length(input.InstructorName, 1, 200) == false || len(input.Description) > 10000 || (input.Visibility != "shared" && input.Visibility != "private" && input.Visibility != "instructors") || (input.ContentBasis != "self_created" && input.ContentBasis != "licensed_for_group" && input.ContentBasis != "personal_purchase") || (input.ContentBasis == "personal_purchase" && input.Visibility != "private") || len(input.Tags) > 30 {
 		return false
 	}
 	for _, optional := range []*string{input.InstructionalName, input.ChapterName} {
