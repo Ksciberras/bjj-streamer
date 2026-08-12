@@ -241,8 +241,8 @@ input[type="file"]::file-selector-button { margin-right: .75rem; border: 1px sol
   position: relative;
   isolation: isolate;
   display: grid;
-  width: min(100%, calc(var(--player-max-height) * 3 / 2));
-  aspect-ratio: 3 / 2;
+  width: min(100%, calc(var(--player-max-height) * 16 / 9));
+  aspect-ratio: 16 / 9;
   max-height: var(--player-max-height);
   margin-inline: auto;
   place-items: center;
@@ -251,14 +251,35 @@ input[type="file"]::file-selector-button { margin-right: .75rem; border: 1px sol
   border-radius: 7px;
   background: #030304;
   box-shadow: 0 14px 36px rgba(0,0,0,.26);
+  container-type: size;
 }
-.player-frame::after { position: absolute; z-index: 1; inset: 0; border: 1px solid rgba(255,255,255,.035); border-radius: inherit; pointer-events: none; content: ""; }
+.player-frame::after {
+  position: absolute;
+  z-index: 0;
+  inset: 0;
+  border: 1px solid rgba(255,255,255,.035);
+  border-radius: inherit;
+  pointer-events: none;
+  content: "";
+}
 .player-frame video {
+  --fit: 1;
+  position: relative;
+  z-index: 1;
   display: block;
-  width: 100%;
-  height: 100%;
-  object-fit: contain;
+  width: min(calc(100cqi * var(--fit)), calc(100cqb * var(--fit) * var(--ar-w, 16) / var(--ar-h, 9)));
+  height: min(calc(100cqb * var(--fit)), calc(100cqi * var(--fit) * var(--ar-h, 9) / var(--ar-w, 16)));
   background: #000;
+}
+@supports not (width: 1cqi) {
+  .player-frame video {
+    width: auto;
+    height: auto;
+    max-width: calc(100% * var(--fit, 1));
+    max-height: calc(100% * var(--fit, 1));
+    aspect-ratio: var(--ar-w, 16) / var(--ar-h, 9);
+    object-fit: contain;
+  }
 }
 .player-loading { display: grid; place-items: center; gap: .4rem; color: var(--muted); text-align: center; }
 .player-loading > span { width: 160px; height: 3px; margin-bottom: .55rem; overflow: hidden; border-radius: 2px; background: var(--surface-hover); animation: pulse 1.4s infinite ease-in-out; }
